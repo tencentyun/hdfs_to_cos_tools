@@ -439,6 +439,15 @@ public class HdfsFileToCosTask implements Runnable {
                 + hdfsFileStatus.getPath().toString());
     }
 
+    private boolean JudgeFolderExist() {
+        try {
+            cosClient.getobjectMetadata(configReader.getBucket(), cosPath);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public void CreateFolder() {
         try {
             cosPath = ConvertHdfsPathToCosPath();
@@ -450,8 +459,14 @@ public class HdfsFileToCosTask implements Runnable {
         }
 
 
+
         try {
-            createFolderWithRetry();
+
+            if (!JudgeFolderExist()) {
+                createFolderWithRetry();
+            } else {
+                log.info("folder already exist!" + cosPath);
+            }
             String taskInfo =
                     String.format("[create folder] [hdfs_path: %s] [cos_path: %s] [ret: %s]",
                             hdfsFileStatus.getPath().toString(), cosPath, "success");
