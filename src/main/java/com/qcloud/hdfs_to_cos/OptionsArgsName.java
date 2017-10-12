@@ -16,6 +16,8 @@ public class OptionsArgsName {
     public static final String COS_CONF_FILE = "cos_info_file";
     public static final String HDFS_CONF_FILE = "hdfs_conf_file";
     public static final String SKIP_IF_LENGTH_MATCH = "skip_if_len_match";
+    public static final String MAX_TASK_NUM = "max_task_num"; // 并发线程数
+    public static final String MAX_MULTIPART_UPLOAD_TASK_NUM = "max_multipart_upload_task_num"; // 分块上传的线程数
 
     public static Options getAllSupportOption() {
         Options options = new Options();
@@ -60,6 +62,16 @@ public class OptionsArgsName {
     public static Option getSecretIdOption() {
         return Option.builder(SECRET_ID).argName(SECRET_ID).hasArg().desc("the cos secret id")
                 .build();
+    }
+    
+    public static Option getMaxTaskNumOption() {
+        return Option.builder(MAX_TASK_NUM).argName(MAX_TASK_NUM).hasArg().desc("max parallel task num to upload file default 4")
+                .build();
+    }
+    
+    public static Option getMaxMultiPartUploadTaskNumOption() {                                     
+        return Option.builder(MAX_MULTIPART_UPLOAD_TASK_NUM).longOpt(MAX_MULTIPART_UPLOAD_TASK_NUM).hasArg()
+                .desc("max parallel multipart upload task num to upload file default 4").build();   
     }
 
     public static Option getSecretKeyOption() {

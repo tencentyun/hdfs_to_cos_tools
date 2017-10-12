@@ -23,8 +23,8 @@ public class ConfigReader {
     private String srcHdfsPath = "";
     private String destCosPath = "";
     private boolean skipIfLengthMatch = false;
-    private static final int MAX_TASK_NUM = 4;
-    private static final int MAX_MultiPartUploadTask_Num = 4;
+    private int maxTaskNum = 4;
+    private int maxMultiPartUploadTaskNum = 4;
     private static final int DEFAULT_PART_SIZE = 32 * 1024 * 1024;
 
     private CommandLine cli = null;
@@ -54,6 +54,10 @@ public class ConfigReader {
             this.region = getRequiredStringParam(OptionsArgsName.REGION, null);
             this.srcHdfsPath = getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
             this.destCosPath = getRequiredStringParam(OptionsArgsName.COS_PATH, null);
+            this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,                           
+                    getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
+            this.maxMultiPartUploadTaskNum = formatLongStr(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM,
+                    getRequiredStringParam(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM, "4")).intValue();
             if (cli.hasOption(OptionsArgsName.SKIP_IF_LENGTH_MATCH)) {
                 this.skipIfLengthMatch = true;
             }
@@ -151,7 +155,7 @@ public class ConfigReader {
             throw new IllegalArgumentException(
                     String.format("config error. config %s is required", key));
         }
-        return value;
+        return value.trim();
     }
 
     private Long formatLongStr(String key, String valueStr) throws IllegalArgumentException {
@@ -201,11 +205,11 @@ public class ConfigReader {
     }
 
     public int getMaxTaskNum() {
-        return MAX_TASK_NUM;
+        return maxTaskNum;
     }
 
     public int getMaxUploadPartTaskNum() {
-        return MAX_MultiPartUploadTask_Num;
+        return maxMultiPartUploadTaskNum;
     }
 
     public int getPartSize() {
