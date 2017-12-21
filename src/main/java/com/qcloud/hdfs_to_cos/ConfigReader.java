@@ -47,7 +47,7 @@ public class ConfigReader {
 
         try {
             this.appid = formatLongStr(OptionsArgsName.APPID,
-                    getRequiredStringParam(OptionsArgsName.APPID, null));
+                    getRequiredStringParam(OptionsArgsName.APPID, "0")).longValue();
             this.secretId = getRequiredStringParam(OptionsArgsName.SECRET_ID, null);
             this.secretKey = getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
             this.bucket = getRequiredStringParam(OptionsArgsName.BUCKET, null);

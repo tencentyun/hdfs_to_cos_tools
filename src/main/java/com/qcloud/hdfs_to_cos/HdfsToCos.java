@@ -65,8 +65,13 @@ public class HdfsToCos {
 
     private void buildCosClient() {
         ClientConfig clientConfig = new ClientConfig(new Region(this.configReader.getRegion()));
-        COSCredentials cred = new BasicCOSCredentials(String.valueOf(this.configReader.getAppid()),
+        COSCredentials cred = null;
+        if (this.configReader.getAppid() == 0) {
+        	cred = new BasicCOSCredentials(this.configReader.getSecretId(), this.configReader.getSecretKey());
+        } else {
+        	cred = new BasicCOSCredentials(String.valueOf(this.configReader.getAppid()),
                 this.configReader.getSecretId(), this.configReader.getSecretKey());
+        }
         cosClient = new COSClient(cred, clientConfig);
     }
 

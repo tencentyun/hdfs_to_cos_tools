@@ -45,13 +45,13 @@ public class OptionsArgsName {
     }
 
     public static Option getAppidOption() {
-        return Option.builder(APPID).longOpt(APPID).argName("appid").hasArg().desc("the cos appid")
+        return Option.builder(APPID).longOpt(APPID).argName("appid").hasArg().desc("the cos appid, deprecated by bucket flags")
                 .build();
     }
 
     public static Option getBucketOption() {
         return Option.builder(BUCKET).longOpt(BUCKET).argName("bucket_name").hasArg()
-                .desc("the cos bucket name").build();
+                .desc("the cos bucket, Consists of user-defined string and system-generated appid, like mybucket-1250000000").build();
     }
 
     public static Option getRegionOption() {
