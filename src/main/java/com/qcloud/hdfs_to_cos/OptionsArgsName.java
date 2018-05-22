@@ -9,6 +9,7 @@ public class OptionsArgsName {
     public static final String APPID = "appid";
     public static final String BUCKET = "bucket";
     public static final String REGION = "region";
+    public static final String ENDPOINT = "endpoint";
     public static final String SECRET_ID = "ak";
     public static final String SECRET_KEY = "sk";
     public static final String HDFS_PATH = "hdfs_path";
@@ -25,6 +26,7 @@ public class OptionsArgsName {
         options.addOption(getAppidOption());
         options.addOption(getBucketOption());
         options.addOption(getRegionOption());
+        options.addOption(getEndpointOption());
         options.addOption(getSecretIdOption());
         options.addOption(getSecretKeyOption());
         options.addOption(getHdfsPathOption());
@@ -59,19 +61,24 @@ public class OptionsArgsName {
                 .desc("the cos region. legal value cn-south, cn-east, cn-north, sg").build();
     }
 
+    public static Option getEndpointOption() {
+        return Option.builder(ENDPOINT).longOpt(ENDPOINT).argName("endpoint").hasArg()
+                .desc("Custom endpoint, Note: If the endpoint option is specified, the region is automatically invalidated").build();
+    }
+
     public static Option getSecretIdOption() {
         return Option.builder(SECRET_ID).argName(SECRET_ID).hasArg().desc("the cos secret id")
                 .build();
     }
-    
+
     public static Option getMaxTaskNumOption() {
         return Option.builder(MAX_TASK_NUM).argName(MAX_TASK_NUM).hasArg().desc("max parallel task num to upload file default 4")
                 .build();
     }
-    
-    public static Option getMaxMultiPartUploadTaskNumOption() {                                     
+
+    public static Option getMaxMultiPartUploadTaskNumOption() {
         return Option.builder(MAX_MULTIPART_UPLOAD_TASK_NUM).longOpt(MAX_MULTIPART_UPLOAD_TASK_NUM).hasArg()
-                .desc("max parallel multipart upload task num to upload file default 4").build();   
+                .desc("max parallel multipart upload task num to upload file default 4").build();
     }
 
     public static Option getSecretKeyOption() {

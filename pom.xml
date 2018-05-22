@@ -103,6 +103,7 @@
 
 
 	<build>
+		<!--这个地方其实可以考虑用shade插件-->
 		<plugins>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
