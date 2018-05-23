@@ -52,8 +52,10 @@ public class ConfigReader {
             this.secretId = getRequiredStringParam(OptionsArgsName.SECRET_ID, null);
             this.secretKey = getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
             this.bucket = getRequiredStringParam(OptionsArgsName.BUCKET, null);
-            this.region = getRequiredStringParam(OptionsArgsName.REGION, null);
             this.endpointSuffix = getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX, null);
+            if (null == this.endpointSuffix){
+                this.region = getRequiredStringParam(OptionsArgsName.REGION, "");
+            }
             this.srcHdfsPath = getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
             this.destCosPath = getRequiredStringParam(OptionsArgsName.COS_PATH, null);
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,                           
