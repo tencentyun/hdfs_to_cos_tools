@@ -63,7 +63,7 @@ public class OptionsArgsName {
 
     public static Option getEndpointOption() {
         return Option.builder(ENDPOINT).longOpt(ENDPOINT).argName("endpoint").hasArg()
-                .desc("Custom endpoint, Note: If the endpoint option is specified, the region is automatically invalidated").build();
+                .desc("Custom ENDPOINT, the final URL consists of bucket and endpoint:{bucket}.{endpoint} Note: If the endpoint option is specified, the region is automatically invalidated").build();
     }
 
     public static Option getSecretIdOption() {
