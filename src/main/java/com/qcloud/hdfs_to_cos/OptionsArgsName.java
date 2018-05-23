@@ -9,7 +9,7 @@ public class OptionsArgsName {
     public static final String APPID = "appid";
     public static final String BUCKET = "bucket";
     public static final String REGION = "region";
-    public static final String ENDPOINT = "endpoint";
+    public static final String ENDPOINT_SUFFIX = "endpoint_suffix";
     public static final String SECRET_ID = "ak";
     public static final String SECRET_KEY = "sk";
     public static final String HDFS_PATH = "hdfs_path";
@@ -26,7 +26,7 @@ public class OptionsArgsName {
         options.addOption(getAppidOption());
         options.addOption(getBucketOption());
         options.addOption(getRegionOption());
-        options.addOption(getEndpointOption());
+        options.addOption(getEndpointSuffixOption());
         options.addOption(getSecretIdOption());
         options.addOption(getSecretKeyOption());
         options.addOption(getHdfsPathOption());
@@ -61,9 +61,9 @@ public class OptionsArgsName {
                 .desc("the cos region. legal value cn-south, cn-east, cn-north, sg").build();
     }
 
-    public static Option getEndpointOption() {
-        return Option.builder(ENDPOINT).longOpt(ENDPOINT).argName("endpoint").hasArg()
-                .desc("Custom ENDPOINT, the final URL consists of bucket and endpoint:{bucket}.{endpoint} Note: If the endpoint option is specified, the region is automatically invalidated").build();
+    public static Option getEndpointSuffixOption() {
+        return Option.builder(ENDPOINT_SUFFIX).longOpt(ENDPOINT_SUFFIX).argName("endpoint_suffix").hasArg()
+                .desc("Custom ENDPOINT_SUFFIX, the final URL consists of bucket and endpoint_suffix:{bucket}.{endpoint_suffix} Note: If the endpoint_suffix option is specified, the region is automatically invalidated").build();
     }
 
     public static Option getSecretIdOption() {

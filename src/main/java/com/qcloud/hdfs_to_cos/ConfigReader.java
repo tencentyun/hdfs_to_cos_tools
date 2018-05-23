@@ -20,7 +20,7 @@ public class ConfigReader {
     private String secretKey = "";
     private String bucket = "";
     private String region = "";
-    private String endpoint = "";
+    private String endpointSuffix = "";
     private String srcHdfsPath = "";
     private String destCosPath = "";
     private boolean skipIfLengthMatch = false;
@@ -53,7 +53,7 @@ public class ConfigReader {
             this.secretKey = getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
             this.bucket = getRequiredStringParam(OptionsArgsName.BUCKET, null);
             this.region = getRequiredStringParam(OptionsArgsName.REGION, null);
-            this.endpoint = getRequiredStringParam(OptionsArgsName.ENDPOINT, null);
+            this.endpointSuffix = getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX, null);
             this.srcHdfsPath = getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
             this.destCosPath = getRequiredStringParam(OptionsArgsName.COS_PATH, null);
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,                           
@@ -198,8 +198,8 @@ public class ConfigReader {
         return region;
     }
 
-    public String getEndpoint() {
-        return endpoint;
+    public String getEndpointSuffix() {
+        return endpointSuffix;
     }
 
     public String getSrcHdfsPath() {
