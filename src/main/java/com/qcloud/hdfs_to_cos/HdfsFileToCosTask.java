@@ -77,7 +77,7 @@ public class HdfsFileToCosTask implements Runnable {
         // hdfs folder path example: hdfs://222:111:333:444:8020/tmp/chengwu/
         if (hdfsFolderPath.startsWith("hdfs://")) {
             hdfsFolderPath =
-                    hdfsFolderPath.substring(hdfsFilePath.indexOf("/", "hdfs://".length()));
+                    hdfsFolderPath.substring(hdfsFolderPath.indexOf("/", "hdfs://".length()));
             // /tmp/chengwu/
         }
 
