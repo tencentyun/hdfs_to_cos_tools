@@ -441,7 +441,7 @@ public class HdfsFileToCosTask implements Runnable {
 
     private boolean JudgeFolderExist() {
         try {
-            cosClient.getobjectMetadata(configReader.getBucket(), cosPath);
+            cosClient.getObjectMetadata(configReader.getBucket(), cosPath);
             return true;
         } catch (Exception e) {
             return false;

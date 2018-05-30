@@ -32,7 +32,7 @@
 		<dependency>
 			<groupId>com.qcloud</groupId>
 			<artifactId>cos_api</artifactId>
-			<version>5.2.3</version>
+			<version>5.4.2</version>
 		</dependency>
 
 		<dependency>
@@ -93,16 +93,17 @@
 			<dependency> <groupId>org.apache.httpcomponents</groupId> <artifactId>httpmime</artifactId> 
 			<version>4.2.5</version> </dependency> -->
 
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-log4j12</artifactId>
-			<version>1.7.2</version>
-		</dependency>
+		<!--<dependency>-->
+			<!--<groupId>org.slf4j</groupId>-->
+			<!--<artifactId>slf4j-log4j12</artifactId>-->
+			<!--<version>1.7.2</version>-->
+		<!--</dependency>-->
 
 	</dependencies>
 
 
 	<build>
+		<!--这个地方其实可以考虑用shade插件-->
 		<plugins>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>

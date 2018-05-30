@@ -13,6 +13,8 @@ jdk 1.7或1.8
 3. 可以在命令行参数中指定配置文件位置, 默认读取conf目录下的cos_info.conf
 4. 如果命令行参数中的参数和配置文件的重合, 则以命令行为准
 
+注意：命令行参数中的region和endpoint_suffix选项不同时生效，endpoint_suffix是最终请求URL的后缀部分，请求的URL由bucket和endpoint共同组成：
+
 # 运行
 
 linux环境下
