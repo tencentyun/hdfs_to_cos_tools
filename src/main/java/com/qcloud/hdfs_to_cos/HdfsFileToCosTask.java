@@ -191,7 +191,6 @@ public class HdfsFileToCosTask implements Runnable {
             String taskInfo =
                     String.format("[upload file failure] [hdfs_path: %s] [cos_path: %s] [msg: %s]",
                             hdfsFileStatus.getPath().toString(), cosPath, e.getMessage());
-            System.out.println();
             log.info(taskInfo);
             Statistics.instance.addUploadFileFail();
             String printlnStr =
@@ -412,7 +411,7 @@ public class HdfsFileToCosTask implements Runnable {
             }
 
             UploadPartTask task = new UploadPartTask(hdfsFileStatus.getPath().toString(), cosPath,
-                    uploadId, partNum, pos, partSize, cosClient, semaphore, configReader);
+                    uploadId, partNum, pos, partSize, cosClient, semaphore, configReader, this.isHar);
             allUploadPartTasks.add(service.submit(task));
             pos += partSize;
         }

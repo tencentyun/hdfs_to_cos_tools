@@ -43,7 +43,7 @@ public class CommonHdfsUtils {
         int port = hdfsFilePath.toUri().getPort();
         String path = hdfsFilePath.toUri().getPath();
 
-        if (scheme.length() == 0 || host.length() == 0) {
+        if (null == scheme || null == host || scheme.length() == 0 || host.length() == 0) {
             return new URI("har://" + path);
         }else{
             return new URI("har://" + scheme + "-" + host + ":" + String.valueOf(port) + path);
