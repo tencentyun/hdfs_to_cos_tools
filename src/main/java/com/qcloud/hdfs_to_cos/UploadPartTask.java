@@ -18,9 +18,8 @@ public class UploadPartTask implements Callable<PartETag> {
     private static final Logger log = LoggerFactory.getLogger(UploadPartTask.class);
 
 
-
     public UploadPartTask(String hdfsPath, String key, String uploadId, int partNumber, long pos,
-            long partSize, COSClient cosClient, Semaphore semaphore, ConfigReader configReader) {
+                          long partSize, COSClient cosClient, Semaphore semaphore, ConfigReader configReader, boolean isHar) {
         super();
         this.hdfsPath = hdfsPath;
         this.key = key;
@@ -31,6 +30,7 @@ public class UploadPartTask implements Callable<PartETag> {
         this.cosClient = cosClient;
         this.semaphore = semaphore;
         this.configReader = configReader;
+        this.isHar = isHar;
     }
 
     public PartETag call() throws Exception {
@@ -46,22 +46,23 @@ public class UploadPartTask implements Callable<PartETag> {
         for (int i = 0; i < kMaxRetryNum; ++i) {
             FSDataInputStream fStream = null;
             try {
-                fStream = CommonHdfsUtils.getFileContentBytes(configReader.getHdfsFS(), hdfsPath,
-                        pos);
+                if (this.isHar) {
+                    fStream = CommonHdfsUtils.getHarFileContentBytes(configReader.getHdfsFS(), hdfsPath,
+                            pos);
+                } else {
+                    fStream = CommonHdfsUtils.getFileContentBytes(configReader.getHdfsFS(), hdfsPath,
+                            pos);
+                }
                 UploadPartRequest uploadRequest =
                         new UploadPartRequest().withBucketName(configReader.getBucket())
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
                                 .withInputStream(fStream).withPartSize(partSize);
-
                 PartETag etag = cosClient.uploadPart(uploadRequest).getPartETag();
                 log.info("upload part success, etag: " + etag.getETag() + ", part_number: "
                         + etag.getPartNumber() + ", bucket: " + configReader.getBucket() + ", key:"
                         + key);
                 return etag;
             } catch (CosServiceException e) {
-                log.error("upload multi-part File failure, retry_num:" + i + ", msg: "
-                        + e.getErrorMessage() + ", retcode:" + e.getErrorCode() + ", xml:"
-                        + e.getErrorResponseXml());
                 continue;
             } finally {
                 if (fStream != null) {
@@ -83,6 +84,7 @@ public class UploadPartTask implements Callable<PartETag> {
         return sb.toString();
     }
 
+    private boolean isHar = false;
     private String hdfsPath;
     private String key;
     private String uploadId;

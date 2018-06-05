@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,7 @@ public class HdfsFileToCosTask implements Runnable {
     private ConfigReader configReader = null;
     private COSClient cosClient = null;
     private FileStatus hdfsFileStatus = null;
+    private boolean isHar = false;
     private String cosPath = null;
     private static final long MAX_PART_SIZE = 2 * 1024 * 1024 * 1024L;
     private static final long MAX_PART_NUM = 10000L;
@@ -53,14 +55,16 @@ public class HdfsFileToCosTask implements Runnable {
     private static final long MULTIPART_UPLOAD_THROLD = 64 * 1024 * 1024L;
 
     private final int kMaxRetryNum = 3;
+    private final int kRetryInterval = 3000;                // 3秒
 
 
     public HdfsFileToCosTask(ConfigReader configReader, COSClient cosClient,
-            FileStatus hdfsFileStatus) {
+                             FileStatus hdfsFileStatus, boolean isHar) {
         super();
         this.configReader = configReader;
         this.cosClient = cosClient;
         this.hdfsFileStatus = hdfsFileStatus;
+        this.isHar = isHar;
     }
 
     private String ConvertHdfsPathToCosPath() throws IllegalArgumentException, IOException {
@@ -80,12 +84,19 @@ public class HdfsFileToCosTask implements Runnable {
                     hdfsFolderPath.substring(hdfsFolderPath.indexOf("/", "hdfs://".length()));
             // /tmp/chengwu/
         }
+        if (hdfsFolderPath.startsWith("har://")){
+            hdfsFolderPath =
+                    hdfsFolderPath.substring(hdfsFolderPath.indexOf("/", "har://".length()));
+        }
 
         // hdfs file path example: hdfs://222:111:333:444:8020/tmp/chengwu/xxx/yyy/len5M.txt
 
         if (hdfsFilePath.startsWith("hdfs://")) {
             hdfsFilePath = hdfsFilePath.substring(hdfsFilePath.indexOf("/", "hdfs://".length()));
             // /tmp/chengwu/xxx/yyy/len5M.txt
+        }
+        if (hdfsFilePath.startsWith("har://")){
+            hdfsFilePath = hdfsFilePath.substring(hdfsFilePath.indexOf("/", "har://".length()));
         }
 
         tmpPath = hdfsFilePath.substring(hdfsFolderPath.length());
@@ -142,8 +153,13 @@ public class HdfsFileToCosTask implements Runnable {
 
 
         try {
-            long fileSize = CommonHdfsUtils.getFileLength(configReader.getHdfsFS(),
-                    hdfsFileStatus.getPath().toString());
+            long fileSize = 0;
+            if (this.isHar) {
+                fileSize = this.hdfsFileStatus.getLen();
+            } else {
+                fileSize = CommonHdfsUtils.getFileLength(configReader.getHdfsFS(),
+                        hdfsFileStatus.getPath().toString());
+            }
             if (fileSize > MAX_FILE_SIZE) {
                 throw new Exception("exceed max support file size, current_file_size: " + fileSize
                         + ", max_file_size: " + MAX_FILE_SIZE);
@@ -176,7 +192,6 @@ public class HdfsFileToCosTask implements Runnable {
             String taskInfo =
                     String.format("[upload file failure] [hdfs_path: %s] [cos_path: %s] [msg: %s]",
                             hdfsFileStatus.getPath().toString(), cosPath, e.getMessage());
-            System.out.println();
             log.info(taskInfo);
             Statistics.instance.addUploadFileFail();
             String printlnStr =
@@ -189,8 +204,12 @@ public class HdfsFileToCosTask implements Runnable {
         for (int i = 0; i < kMaxRetryNum; ++i) {
             FSDataInputStream fStream = null;
             try {
-                fStream = CommonHdfsUtils.getFileContentBytes(configReader.getHdfsFS(),
-                        hdfsFileStatus.getPath().toString(), 0);
+                if (this.isHar) {
+                    fStream = CommonHdfsUtils.getHarFileContentBytes(configReader.getHdfsFS(), hdfsFileStatus.getPath().toString(), 0);
+                } else {
+                    fStream = CommonHdfsUtils.getFileContentBytes(configReader.getHdfsFS(),
+                            hdfsFileStatus.getPath().toString(), 0);
+                }
                 ObjectMetadata meta = new ObjectMetadata();
                 meta.setContentLength(fileSize);
                 PutObjectRequest putObjectRequest =
@@ -201,6 +220,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("upload Singe File failure, retry_num:" + i + ", msg: "
                         + e.getErrorMessage() + ", retcode:" + e.getErrorCode() + ", xml:"
                         + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } finally {
                 if (fStream != null) {
@@ -229,6 +249,7 @@ public class HdfsFileToCosTask implements Runnable {
             } catch (CosServiceException e) {
                 log.error("create Folder failure, retry_num:" + i + ", msg: " + e.getErrorMessage()
                         + ", retcode:" + e.getErrorCode() + ", xml:" + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } finally {
                 if (inputStream != null) {
@@ -297,6 +318,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("init multi upload failure, cos_path: " + cosPath + ", retry_num:" + i
                         + ", msg: " + e.getErrorMessage() + ", retcode:" + e.getErrorCode()
                         + ", xml:" + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } catch (Exception e) {
                 throw e;
@@ -335,7 +357,7 @@ public class HdfsFileToCosTask implements Runnable {
     }
 
     private Map<Integer, PartSummary> identifyExistingPartsForResume(String cosPath,
-            String uploadId) {
+                                                                     String uploadId) {
         Map<Integer, PartSummary> partNumbers = new HashMap<Integer, PartSummary>();
         if (uploadId == null) {
             return partNumbers;
@@ -393,7 +415,7 @@ public class HdfsFileToCosTask implements Runnable {
             }
 
             UploadPartTask task = new UploadPartTask(hdfsFileStatus.getPath().toString(), cosPath,
-                    uploadId, partNum, pos, partSize, cosClient, semaphore, configReader);
+                    uploadId, partNum, pos, partSize, cosClient, semaphore, configReader, this.isHar);
             allUploadPartTasks.add(service.submit(task));
             pos += partSize;
         }
@@ -429,6 +451,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("complete multi upload failure, retry_num:" + i + ", msg: "
                         + e.getErrorMessage() + ", retcode:" + e.getErrorCode() + ", xml:"
                         + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } catch (Exception e) {
                 throw e;
@@ -457,7 +480,6 @@ public class HdfsFileToCosTask implements Runnable {
                     + configReader.getSrcHdfsPath() + ", hdfsFolderPath: "
                     + hdfsFileStatus.getPath().toString() + ", exception: " + e.toString());
         }
-
 
 
         try {

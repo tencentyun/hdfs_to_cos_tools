@@ -2,6 +2,7 @@ package com.qcloud.hdfs_to_cos;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +31,7 @@ public class HdfsToCos {
 
     private ConfigReader configReader = null;
     private ArrayList<FileStatus> fileStatusArry = null;
+    private ArrayList<FileStatus> harFileStatusArray = null;
     private ExecutorService threadPool = null;
     private COSClient cosClient = null;
 
@@ -36,12 +39,36 @@ public class HdfsToCos {
         super();
         this.configReader = configReader;
         this.fileStatusArry = new ArrayList<FileStatus>();
+        this.harFileStatusArray = new ArrayList<FileStatus>();
         this.threadPool = Executors.newFixedThreadPool(configReader.getMaxTaskNum());
     }
 
+    private void scanHarMember(Path filePath, HarFileSystem harFs) throws IOException, URISyntaxException {
+        FileStatus targetPathStatus = harFs.getFileStatus(filePath);
+        if (targetPathStatus.isFile()) {
+            this.harFileStatusArray.add(targetPathStatus);
+            return;
+        }
+
+        FileStatus[] pathStatus = harFs.listStatus(filePath);
+        for (FileStatus fileStatus : pathStatus) {
+            if (CommonHdfsUtils.isHarFile(fileStatus)) {
+                harFs.initialize(CommonHdfsUtils.buildHarFsUri(fileStatus.getPath()), harFs.getConf());
+                scanHarMember(fileStatus.getPath(), harFs);
+            }
+
+            if (fileStatus.isFile()) {
+                this.harFileStatusArray.add(fileStatus);
+            }
+
+            if (fileStatus.isDirectory()) {
+                scanHarMember(fileStatus.getPath(), harFs);
+            }
+        }
+    }
 
     private void scanHdfsMember(Path hdfsPath, FileSystem hdfsFS)
-            throws FileNotFoundException, IOException {
+            throws FileNotFoundException, IOException, URISyntaxException {
         FileStatus targetPathStatus = hdfsFS.getFileStatus(hdfsPath);
         if (targetPathStatus.isFile()) {
             fileStatusArry.add(targetPathStatus);
@@ -49,16 +76,23 @@ public class HdfsToCos {
         }
         FileStatus[] memberArry = hdfsFS.listStatus(hdfsPath);
         for (FileStatus member : memberArry) {
-            fileStatusArry.add(member);
-            if (member.isDirectory()) {
-                scanHdfsMember(member.getPath(), hdfsFS);
+            if (CommonHdfsUtils.isHarFile(member)) {
+                HarFileSystem harFileSystem = new HarFileSystem(hdfsFS);
+                harFileSystem.initialize(CommonHdfsUtils.buildHarFsUri(member.getPath()), hdfsFS.getConf());
+                scanHarMember(member.getPath(), harFileSystem);
+            } else {
+                this.fileStatusArry.add(member);
+                if (member.isDirectory()) {
+                    scanHdfsMember(member.getPath(), hdfsFS);
+                }
             }
         }
     }
 
 
-    private void buildHdfsFileList() throws IOException {
+    private void buildHdfsFileList() throws IOException, URISyntaxException {
         fileStatusArry.clear();
+        this.harFileStatusArray.clear();
         FileSystem hdfsFS = configReader.getHdfsFS();
         scanHdfsMember(new Path(configReader.getSrcHdfsPath()), hdfsFS);
     }
@@ -121,14 +155,23 @@ public class HdfsToCos {
             System.err.println(errMsg);
             cosClient.shutdown();
             return;
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
         }
 
         for (int index = 0; index < fileStatusArry.size(); ++index) {
             FileStatus fileStatus = fileStatusArry.get(index);
             HdfsFileToCosTask task =
-                    new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus);
+                    new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, false);
             threadPool.submit(task);
         }
+
+        for (int index = 0; index < harFileStatusArray.size(); index++) {
+            FileStatus fileStatus = this.harFileStatusArray.get(index);
+            HdfsFileToCosTask task = new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, true);
+            threadPool.submit(task);
+        }
+
         threadPool.shutdown();
         try {
             threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.HOURS);
