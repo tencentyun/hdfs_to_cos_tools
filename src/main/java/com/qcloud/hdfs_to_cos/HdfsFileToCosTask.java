@@ -55,6 +55,7 @@ public class HdfsFileToCosTask implements Runnable {
     private static final long MULTIPART_UPLOAD_THROLD = 64 * 1024 * 1024L;
 
     private final int kMaxRetryNum = 3;
+    private final int kRetryInterval = 3000;                // 3秒
 
 
     public HdfsFileToCosTask(ConfigReader configReader, COSClient cosClient,
@@ -219,6 +220,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("upload Singe File failure, retry_num:" + i + ", msg: "
                         + e.getErrorMessage() + ", retcode:" + e.getErrorCode() + ", xml:"
                         + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } finally {
                 if (fStream != null) {
@@ -247,6 +249,7 @@ public class HdfsFileToCosTask implements Runnable {
             } catch (CosServiceException e) {
                 log.error("create Folder failure, retry_num:" + i + ", msg: " + e.getErrorMessage()
                         + ", retcode:" + e.getErrorCode() + ", xml:" + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } finally {
                 if (inputStream != null) {
@@ -315,6 +318,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("init multi upload failure, cos_path: " + cosPath + ", retry_num:" + i
                         + ", msg: " + e.getErrorMessage() + ", retcode:" + e.getErrorCode()
                         + ", xml:" + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } catch (Exception e) {
                 throw e;
@@ -447,6 +451,7 @@ public class HdfsFileToCosTask implements Runnable {
                 log.error("complete multi upload failure, retry_num:" + i + ", msg: "
                         + e.getErrorMessage() + ", retcode:" + e.getErrorCode() + ", xml:"
                         + e.getErrorResponseXml());
+                Thread.sleep(kRetryInterval);
                 continue;
             } catch (Exception e) {
                 throw e;
