@@ -154,6 +154,9 @@ public class ConfigReader {
         }
         if (value == null) {
             value = defaultValue;
+            if(key.compareTo(OptionsArgsName.ENDPOINT_SUFFIX) == 0){                    // endpoint_suffix不是一个必选项
+                return value;
+            }
         }
         if (value == null) {
             throw new IllegalArgumentException(

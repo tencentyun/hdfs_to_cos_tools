@@ -9,7 +9,7 @@ public class OptionsArgsName {
     public static final String APPID = "appid";
     public static final String BUCKET = "bucket";
     public static final String REGION = "region";
-    public static final String ENDPOINT_SUFFIX = "endpoint_suffix";
+    public static final String ENDPOINT_SUFFIX = "endpoint_suffix";             // 这个是可选项
     public static final String SECRET_ID = "ak";
     public static final String SECRET_KEY = "sk";
     public static final String HDFS_PATH = "hdfs_path";
