@@ -4,9 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -30,17 +28,19 @@ public class HdfsToCos {
     private static final Logger log = LoggerFactory.getLogger(HdfsToCos.class);
 
     private ConfigReader configReader = null;
-    private ArrayList<FileStatus> fileStatusArry = null;
+    private ArrayList<FileStatus> fileStatusArray = null;
     private ArrayList<FileStatus> harFileStatusArray = null;
     private ExecutorService threadPool = null;
+    private Semaphore limitSemaphore = null;
     private COSClient cosClient = null;
 
     public HdfsToCos(ConfigReader configReader) {
         super();
         this.configReader = configReader;
-        this.fileStatusArry = new ArrayList<FileStatus>();
+        this.fileStatusArray = new ArrayList<FileStatus>();
         this.harFileStatusArray = new ArrayList<FileStatus>();
         this.threadPool = Executors.newFixedThreadPool(configReader.getMaxTaskNum());
+        this.limitSemaphore = new Semaphore(configReader.getMaxTaskNum() * 3);              // FIXME 这里暂时写死为 * 3
     }
 
     private void scanHarMember(Path filePath, HarFileSystem harFs) throws IOException, URISyntaxException {
@@ -52,8 +52,9 @@ public class HdfsToCos {
 
         FileStatus[] pathStatus = harFs.listStatus(filePath);
         for (FileStatus fileStatus : pathStatus) {
-            if (CommonHdfsUtils.isHarFile(fileStatus)) {
-                harFs.initialize(CommonHdfsUtils.buildHarFsUri(fileStatus.getPath()), harFs.getConf());
+            System.out.println(fileStatus);
+            if (CommonHarUtils.isHarFile(fileStatus)) {
+                harFs.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), harFs.getConf());
                 scanHarMember(fileStatus.getPath(), harFs);
             }
 
@@ -71,17 +72,17 @@ public class HdfsToCos {
             throws FileNotFoundException, IOException, URISyntaxException {
         FileStatus targetPathStatus = hdfsFS.getFileStatus(hdfsPath);
         if (targetPathStatus.isFile()) {
-            fileStatusArry.add(targetPathStatus);
+            fileStatusArray.add(targetPathStatus);
             return;
         }
         FileStatus[] memberArry = hdfsFS.listStatus(hdfsPath);
         for (FileStatus member : memberArry) {
-            if (CommonHdfsUtils.isHarFile(member)) {
-                HarFileSystem harFileSystem = new HarFileSystem(hdfsFS);
-                harFileSystem.initialize(CommonHdfsUtils.buildHarFsUri(member.getPath()), hdfsFS.getConf());
-                scanHarMember(member.getPath(), harFileSystem);
+            if (CommonHarUtils.isHarFile(member)) {
+                HarFileSystem harFS = new HarFileSystem(configReader.getHdfsFS());
+                harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()), hdfsFS.getConf());
+                scanHarMember(member.getPath(), harFS);
             } else {
-                this.fileStatusArry.add(member);
+                this.fileStatusArray.add(member);
                 if (member.isDirectory()) {
                     scanHdfsMember(member.getPath(), hdfsFS);
                 }
@@ -89,12 +90,20 @@ public class HdfsToCos {
         }
     }
 
-
     private void buildHdfsFileList() throws IOException, URISyntaxException {
-        fileStatusArry.clear();
+        fileStatusArray.clear();
         this.harFileStatusArray.clear();
         FileSystem hdfsFS = configReader.getHdfsFS();
-        scanHdfsMember(new Path(configReader.getSrcHdfsPath()), hdfsFS);
+        String srcPath = configReader.getSrcHdfsPath();
+        this.scanHdfsMember(new Path(srcPath), hdfsFS);
+    }
+
+    private void buildHarFileList() throws URISyntaxException, IOException {
+        this.harFileStatusArray.clear();
+        HarFileSystem harFs = new HarFileSystem(configReader.getHdfsFS());
+        harFs.initialize(CommonHarUtils.buildFsUri(new Path(configReader.getSrcHdfsPath())), configReader.getHdfsFS().getConf());
+        String srcPath = configReader.getSrcHdfsPath();
+        this.scanHarMember(new Path(srcPath), harFs);
     }
 
     private void buildCosClient() {
@@ -148,7 +157,11 @@ public class HdfsToCos {
         }
 
         try {
-            buildHdfsFileList();
+            if (configReader.getSrcHdfsPath().startsWith("har://")) {
+                this.buildHarFileList();
+            } else {
+                this.buildHdfsFileList();
+            }
         } catch (IOException e) {
             String errMsg = String.format("get hdfs member occur a exception: %s", e.getMessage());
             log.error(errMsg);
@@ -159,17 +172,44 @@ public class HdfsToCos {
             e.printStackTrace();
         }
 
-        for (int index = 0; index < fileStatusArry.size(); ++index) {
-            FileStatus fileStatus = fileStatusArry.get(index);
-            HdfsFileToCosTask task =
-                    new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, false);
-            threadPool.submit(task);
+        log.info("Normal file status array size: " + String.valueOf(fileStatusArray.size()));
+        log.info("Har file status array size: " + String.valueOf(harFileStatusArray.size()));
+
+        for (int index = 0; index < fileStatusArray.size(); ++index) {
+            FileStatus fileStatus = fileStatusArray.get(index);
+            try {
+                this.limitSemaphore.acquire();
+                FileToCosTask hdfsFileToCostask =
+                        new FileToCosTask(this.configReader, this.cosClient, fileStatus, this.configReader.getHdfsFS(),CommonHdfsUtils.convertToCosPath(configReader,fileStatus.getPath()).toString(), this.limitSemaphore);
+                threadPool.submit(hdfsFileToCostask);
+            } catch (InterruptedException e) {
+                log.error("Acquire the limit externalSemaphore interrupted exception: " + e.getMessage());
+                this.limitSemaphore.release();                          // 异常发生，必须release，防止死锁
+            } catch (IOException e) {
+                log.error("create hdfs file ["+ fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
+                this.limitSemaphore.release();                          // 异常发生，必须release，防止死锁
+            }
         }
 
         for (int index = 0; index < harFileStatusArray.size(); index++) {
             FileStatus fileStatus = this.harFileStatusArray.get(index);
-            HdfsFileToCosTask task = new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, true);
-            threadPool.submit(task);
+            try {
+                this.limitSemaphore.acquire();
+                HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
+                harFileSystem.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), configReader.getHdfsFS().getConf());
+                FileToCosTask harFileToCosTask = new FileToCosTask(this.configReader, this.cosClient, fileStatus, harFileSystem, CommonHarUtils.convertToCosPath(configReader, fileStatus.getPath()).toString(), this.limitSemaphore);
+                threadPool.submit(harFileToCosTask);
+            } catch (InterruptedException e) {
+                log.error("Acquire the limit externalSemaphore interrupted exception: " + e.getMessage());
+                this.limitSemaphore.release();
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+                this.limitSemaphore.release();
+            } catch (IOException e) {
+                log.error("create har file [" + fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                this.limitSemaphore.release();
+            }
         }
 
         threadPool.shutdown();

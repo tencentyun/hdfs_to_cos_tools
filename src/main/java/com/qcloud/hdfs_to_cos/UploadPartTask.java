@@ -5,6 +5,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Semaphore;
 
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,10 +20,11 @@ public class UploadPartTask implements Callable<PartETag> {
     private static final Logger log = LoggerFactory.getLogger(UploadPartTask.class);
 
 
-    public UploadPartTask(String hdfsPath, String key, String uploadId, int partNumber, long pos,
-                          long partSize, COSClient cosClient, Semaphore semaphore, ConfigReader configReader, boolean isHar) {
+    public UploadPartTask(FileSystem fileSystem, Path filePath, String key, String uploadId, int partNumber, long pos,
+                          long partSize, COSClient cosClient, Semaphore semaphore, ConfigReader configReader) {
         super();
-        this.hdfsPath = hdfsPath;
+        this.fileSystem = fileSystem;
+        this.filePath = filePath;
         this.key = key;
         this.uploadId = uploadId;
         this.partNumber = partNumber;
@@ -30,14 +33,15 @@ public class UploadPartTask implements Callable<PartETag> {
         this.cosClient = cosClient;
         this.semaphore = semaphore;
         this.configReader = configReader;
-        this.isHar = isHar;
     }
 
     public PartETag call() throws Exception {
         try {
             return uploadPartWithRetry();
         } finally {
-            semaphore.release();
+            if (null != this.semaphore) {
+                semaphore.release();
+            }
         }
     }
 
@@ -46,13 +50,8 @@ public class UploadPartTask implements Callable<PartETag> {
         for (int i = 0; i < kMaxRetryNum; ++i) {
             FSDataInputStream fStream = null;
             try {
-                if (this.isHar) {
-                    fStream = CommonHdfsUtils.getHarFileContentBytes(configReader.getHdfsFS(), hdfsPath,
-                            pos);
-                } else {
-                    fStream = CommonHdfsUtils.getFileContentBytes(configReader.getHdfsFS(), hdfsPath,
-                            pos);
-                }
+                fStream = this.fileSystem.open(this.filePath);
+                fStream.skip(this.pos);
                 UploadPartRequest uploadRequest =
                         new UploadPartRequest().withBucketName(configReader.getBucket())
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
@@ -84,8 +83,8 @@ public class UploadPartTask implements Callable<PartETag> {
         return sb.toString();
     }
 
-    private boolean isHar = false;
-    private String hdfsPath;
+    private FileSystem fileSystem;
+    private Path filePath;
     private String key;
     private String uploadId;
     private int partNumber;
