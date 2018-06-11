@@ -1,5 +1,6 @@
 package com.qcloud.hdfs_to_cos;
 
+import com.sun.jndi.toolkit.url.Uri;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -23,8 +24,6 @@ public class CommonHarUtils {
             throw new NullPointerException("har file path is null");
         }
 
-        String srcPath = configReader.getSrcHdfsPath();
-        String harFileFolderPath = srcPath;
         HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
         try {
             harFileSystem.initialize(buildFsUri(harFilePath), configReader.getHdfsFS().getConf());
@@ -34,16 +33,14 @@ public class CommonHarUtils {
             e.printStackTrace();
         }
 
-        String filePath = harFilePath.toUri().getPath();
-        if (harFileSystem.getFileStatus(new Path(filePath)).isFile()) {
-            harFileFolderPath = srcPath.substring(0, srcPath.lastIndexOf("/"));
-        }
 
+        String harFileFolderPath = harFileSystem.getHomeDirectory().toUri().getPath();
         String destPath = configReader.getDestCosPath();
         if (destPath.endsWith("/")) {
             destPath = destPath.substring(0, destPath.length() - 1);
         }
 
+        String filePath = harFilePath.toUri().getPath();
         if (harFileSystem.getFileStatus(new Path(filePath)).isFile()) {
             return new Path(filePath.replace(harFileFolderPath, destPath));
         } else {

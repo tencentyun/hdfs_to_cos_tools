@@ -180,15 +180,20 @@ public class HdfsToCos {
             try {
                 this.limitSemaphore.acquire();
                 FileToCosTask hdfsFileToCostask =
-                        new FileToCosTask(this.configReader, this.cosClient, fileStatus, this.configReader.getHdfsFS(),CommonHdfsUtils.convertToCosPath(configReader,fileStatus.getPath()).toString(), this.limitSemaphore);
+                        new FileToCosTask(this.configReader, this.cosClient, fileStatus, this.configReader.getHdfsFS(), CommonHdfsUtils.convertToCosPath(configReader, fileStatus.getPath()).toString(), this.limitSemaphore);
                 threadPool.submit(hdfsFileToCostask);
             } catch (InterruptedException e) {
                 log.error("Acquire the limit externalSemaphore interrupted exception: " + e.getMessage());
-                this.limitSemaphore.release();                          // 异常发生，必须release，防止死锁
-            } catch (IOException e) {
-                log.error("create hdfs file ["+ fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
                 Statistics.instance.addUploadFileFail();
                 this.limitSemaphore.release();                          // 异常发生，必须release，防止死锁
+            } catch (IOException e) {
+                log.error("create hdfs file [" + fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
+                this.limitSemaphore.release();                          // 异常发生，必须release，防止死锁
+            }catch (Exception e){
+                log.error("create hdfs file [" + fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
+                this.limitSemaphore.release();
             }
         }
 
@@ -202,12 +207,19 @@ public class HdfsToCos {
                 threadPool.submit(harFileToCosTask);
             } catch (InterruptedException e) {
                 log.error("Acquire the limit externalSemaphore interrupted exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
                 this.limitSemaphore.release();
             } catch (URISyntaxException e) {
                 e.printStackTrace();
+                Statistics.instance.addUploadFileFail();
                 this.limitSemaphore.release();
             } catch (IOException e) {
                 log.error("create har file [" + fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
+                this.limitSemaphore.release();
+            } catch (Exception e) {
+                log.error("create har file [" + fileStatus.getPath().toString() + "] to cos task occurs an exception: " + e.getMessage());
+                Statistics.instance.addUploadFileFail();
                 this.limitSemaphore.release();
             }
         }

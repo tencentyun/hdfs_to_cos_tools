@@ -36,16 +36,22 @@ public class CommonHdfsUtils {
         }
         String filePath = hdfsFilePath.toUri().getPath();
         String destPath = configReader.getDestCosPath();
-        if(destPath.endsWith("/")){
+        if (destPath.endsWith("/")) {
             destPath = destPath.substring(0, destPath.length() - 1);
         }
-        if(configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()){
+        if (configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()) {
             // 是个文件
-            return new Path(filePath.replace(hdfsFolderPath,destPath));
-        }
-        else{
-            // 是个目录
-            return new Path(filePath.replace(hdfsFolderPath, destPath) + "/");
+            if(hdfsFolderPath.compareToIgnoreCase("/") == 0){
+                return new Path(destPath + filePath);
+            }else{
+                return new Path(filePath.replace(hdfsFolderPath, destPath));
+            }
+        } else {
+            if(hdfsFilePath.compareTo("/") == 0){
+                return new Path(destPath + filePath);
+            }else{
+                return new Path(filePath.replace(hdfsFolderPath, destPath) + "/");
+            }
         }
     }
 }

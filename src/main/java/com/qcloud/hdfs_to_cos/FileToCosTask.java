@@ -113,7 +113,7 @@ public class FileToCosTask implements Runnable {
         log.info(taskInfo);
         Statistics.instance.addUploadFileOk();
         String printlnStr =
-                String.format("[ok] [hdfs_path: %s]", this.fileStatus.getPath().toString());
+                String.format("[ok] [file path: %s]", this.fileStatus.getPath().toString());
         System.out.println(printlnStr);
     }
 
