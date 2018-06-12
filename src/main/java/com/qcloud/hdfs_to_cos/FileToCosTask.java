@@ -24,22 +24,20 @@ public class FileToCosTask implements Runnable {
     private static final long MULTIPART_UPLOAD_THRESHOLD = 64 * 1024 * 1024L;
 
     private final int kMaxRetryNum = 3;
-    private final int kRetryInterval = 3000;        // 重试间隔时间
+    private final int kRetryInterval = 3000;                                    // 重试间隔时间
 
     protected ConfigReader configReader = null;
     protected COSClient cosClient = null;
     protected FileStatus fileStatus = null;
     protected FileSystem fileSystem = null;
     protected String cosPath = null;
-    protected Semaphore externalSemaphore = null;
 
-    public FileToCosTask(ConfigReader configReader, COSClient cosClient, FileStatus fileStatus, FileSystem fileSystem, String cosPath, Semaphore semaphore) {
+    public FileToCosTask(ConfigReader configReader, COSClient cosClient, FileStatus fileStatus, FileSystem fileSystem, String cosPath) {
         this.configReader = configReader;
         this.cosClient = cosClient;
         this.fileStatus = fileStatus;
         this.fileSystem = fileSystem;
         this.cosPath = cosPath;
-        this.externalSemaphore = semaphore;
     }
 
     private void checkInternalMember() throws NullPointerException, IllegalArgumentException {
@@ -420,11 +418,7 @@ public class FileToCosTask implements Runnable {
                 this.CreateFolder();
             }
         } catch (Exception e) {
-
         } finally {
-            if (null != this.externalSemaphore) {
-                this.externalSemaphore.release();
-            }
         }
     }
 }
