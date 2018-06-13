@@ -62,8 +62,6 @@ public class HdfsToCos {
             }
 
             if (fileStatus.isDirectory()) {
-                FileToCosTask task = this.buildHdfsFileToCosTask(fileStatus);
-                this.submitTask(task);
                 scanHarMember(fileStatus.getPath(), harFs);
             }
         }

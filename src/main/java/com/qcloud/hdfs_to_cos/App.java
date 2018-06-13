@@ -83,7 +83,7 @@ public class App {
         App.executorPool.shutdown();                // 停止提交新的任务
         HdfsToCos hdfsToCos = new HdfsToCos(configReader, App.taskBlockingQueue, App.cosClient);
         hdfsToCos.run();
-        while(App.taskBlockingQueue.size() == 0){
+        while(App.taskBlockingQueue.size() != 0){
             try {
                 Thread.sleep(1 * 1000);
             } catch (InterruptedException e) {
