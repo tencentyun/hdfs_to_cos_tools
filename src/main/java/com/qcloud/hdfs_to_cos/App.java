@@ -9,6 +9,8 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -18,6 +20,8 @@ import java.util.concurrent.*;
  * Hello world!
  */
 public class App {
+    static final Logger LOG = LoggerFactory.getLogger(App.class);
+
     public static COSClient cosClient = null;
     public static BlockingQueue<FileToCosTask> taskBlockingQueue = null;
     public static ExecutorService executorPool = null;
@@ -87,7 +91,7 @@ public class App {
             try {
                 Thread.sleep(1 * 1000);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOG.error("An exception occurred during the polling interval", e);
             }
         }
         for (HdfsToCosExecutor executor : App.executors) {
@@ -96,7 +100,7 @@ public class App {
         try {
             App.executorPool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOG.error("An exception occurred while waiting for the thread pool to complete", e);
         }
         Statistics.instance.printStatics();
     }
