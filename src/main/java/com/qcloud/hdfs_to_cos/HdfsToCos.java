@@ -1,12 +1,8 @@
 package com.qcloud.hdfs_to_cos;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -16,13 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.qcloud.cos.COSClient;
-import com.qcloud.cos.ClientConfig;
-import com.qcloud.cos.auth.BasicCOSCredentials;
-import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;
 import com.qcloud.cos.model.GetObjectMetadataRequest;
-import com.qcloud.cos.region.Region;
 
 
 public class HdfsToCos {
@@ -30,35 +22,43 @@ public class HdfsToCos {
     private static final Logger log = LoggerFactory.getLogger(HdfsToCos.class);
 
     private ConfigReader configReader = null;
-    private ArrayList<FileStatus> fileStatusArry = null;
-    private ArrayList<FileStatus> harFileStatusArray = null;
-    private ExecutorService threadPool = null;
+    private BlockingQueue<FileToCosTask> taskBlockingQueue = null;
     private COSClient cosClient = null;
 
-    public HdfsToCos(ConfigReader configReader) {
-        super();
+    public HdfsToCos(ConfigReader configReader, BlockingQueue<FileToCosTask> taskBlockingQueue, COSClient cosClient) {
         this.configReader = configReader;
-        this.fileStatusArry = new ArrayList<FileStatus>();
-        this.harFileStatusArray = new ArrayList<FileStatus>();
-        this.threadPool = Executors.newFixedThreadPool(configReader.getMaxTaskNum());
+        this.taskBlockingQueue = taskBlockingQueue;
+        this.cosClient = cosClient;
     }
 
-    private void scanHarMember(Path filePath, HarFileSystem harFs) throws IOException, URISyntaxException {
+    private void submitTask(FileToCosTask task) throws Exception {
+        if (null == task) {
+            throw new IllegalArgumentException("can not submit a null task.");
+        }
+
+        if (null == this.taskBlockingQueue) {
+            throw new NullPointerException("can not submit a task to null blocking queue.");
+        }
+        this.taskBlockingQueue.put(task);
+    }
+
+    private void scanHarMember(Path filePath, HarFileSystem harFs) throws Exception {
         FileStatus targetPathStatus = harFs.getFileStatus(filePath);
         if (targetPathStatus.isFile()) {
-            this.harFileStatusArray.add(targetPathStatus);
+            FileToCosTask task = this.buildHarFileToCosTask(targetPathStatus);
+            this.submitTask(task);
             return;
         }
 
         FileStatus[] pathStatus = harFs.listStatus(filePath);
         for (FileStatus fileStatus : pathStatus) {
-            if (CommonHdfsUtils.isHarFile(fileStatus)) {
-                harFs.initialize(CommonHdfsUtils.buildHarFsUri(fileStatus.getPath()), harFs.getConf());
+            if (CommonHarUtils.isHarFile(fileStatus)) {
+                harFs.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), harFs.getConf());
                 scanHarMember(fileStatus.getPath(), harFs);
             }
 
             if (fileStatus.isFile()) {
-                this.harFileStatusArray.add(fileStatus);
+                this.submitTask(this.buildHarFileToCosTask(fileStatus));
             }
 
             if (fileStatus.isDirectory()) {
@@ -67,21 +67,20 @@ public class HdfsToCos {
         }
     }
 
-    private void scanHdfsMember(Path hdfsPath, FileSystem hdfsFS)
-            throws FileNotFoundException, IOException, URISyntaxException {
+    private void scanHdfsMember(Path hdfsPath, FileSystem hdfsFS) throws Exception {
         FileStatus targetPathStatus = hdfsFS.getFileStatus(hdfsPath);
         if (targetPathStatus.isFile()) {
-            fileStatusArry.add(targetPathStatus);
+            this.submitTask(this.buildHdfsFileToCosTask(targetPathStatus));
             return;
         }
         FileStatus[] memberArry = hdfsFS.listStatus(hdfsPath);
         for (FileStatus member : memberArry) {
-            if (CommonHdfsUtils.isHarFile(member)) {
-                HarFileSystem harFileSystem = new HarFileSystem(hdfsFS);
-                harFileSystem.initialize(CommonHdfsUtils.buildHarFsUri(member.getPath()), hdfsFS.getConf());
-                scanHarMember(member.getPath(), harFileSystem);
+            if (CommonHarUtils.isHarFile(member)) {
+                HarFileSystem harFS = new HarFileSystem(configReader.getHdfsFS());
+                harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()), hdfsFS.getConf());
+                scanHarMember(member.getPath(), harFS);
             } else {
-                this.fileStatusArry.add(member);
+                this.submitTask(this.buildHdfsFileToCosTask(member));
                 if (member.isDirectory()) {
                     scanHdfsMember(member.getPath(), hdfsFS);
                 }
@@ -89,25 +88,41 @@ public class HdfsToCos {
         }
     }
 
-
-    private void buildHdfsFileList() throws IOException, URISyntaxException {
-        fileStatusArry.clear();
-        this.harFileStatusArray.clear();
-        FileSystem hdfsFS = configReader.getHdfsFS();
-        scanHdfsMember(new Path(configReader.getSrcHdfsPath()), hdfsFS);
+    private FileToCosTask buildHdfsFileToCosTask(FileStatus fileStatus) {
+        if (null == fileStatus) {
+            log.error("parameter file status is null.");
+            return null;
+        }
+        FileToCosTask task = null;
+        try {
+            task = new FileToCosTask(this.configReader, this.cosClient, fileStatus, this.configReader.getHdfsFS(), CommonHdfsUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+        } catch (IOException e) {
+            log.error("build a hdfsFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            return null;
+        }
+        return task;
     }
 
-    private void buildCosClient() {
-        ClientConfig clientConfig = new ClientConfig(new Region(this.configReader.getRegion()));
-        clientConfig.setEndPointSuffix(this.configReader.getEndpointSuffix());
-        COSCredentials cred = null;
-        if (this.configReader.getAppid() == 0) {
-            cred = new BasicCOSCredentials(this.configReader.getSecretId(), this.configReader.getSecretKey());
-        } else {
-            cred = new BasicCOSCredentials(String.valueOf(this.configReader.getAppid()),
-                    this.configReader.getSecretId(), this.configReader.getSecretKey());
+    private FileToCosTask buildHarFileToCosTask(FileStatus fileStatus) {
+        if (null == fileStatus) {
+            log.error("parameter file status is null.");
+            return null;
         }
-        cosClient = new COSClient(cred, clientConfig);
+
+        FileToCosTask task = null;
+        try {
+            HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
+            harFileSystem.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), configReader.getHdfsFS().getConf());
+            task = new FileToCosTask(this.configReader, this.cosClient, fileStatus, harFileSystem, CommonHarUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+        } catch (IOException e) {
+            log.error("build harFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            return null;
+        } catch (URISyntaxException e) {
+            log.error("build harFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            return null;
+        }
+
+        return task;
     }
 
     private boolean checkCosClientLegal() {
@@ -134,7 +149,6 @@ public class HdfsToCos {
 
 
     public void run() {
-        buildCosClient();
         if (!checkCosClientLegal()) {
             StringBuilder errMsgBuilder =
                     new StringBuilder("Get bucket info error! please check your config info\n");
@@ -148,36 +162,21 @@ public class HdfsToCos {
         }
 
         try {
-            buildHdfsFileList();
-        } catch (IOException e) {
-            String errMsg = String.format("get hdfs member occur a exception: %s", e.getMessage());
-            log.error(errMsg);
-            System.err.println(errMsg);
-            cosClient.shutdown();
-            return;
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
+            if (configReader.getSrcHdfsPath().startsWith("har://")) {
+                HarFileSystem harFs = new HarFileSystem(configReader.getHdfsFS());
+                harFs.initialize(CommonHarUtils.buildFsUri(new Path(configReader.getSrcHdfsPath())), configReader.getHdfsFS().getConf());
+                String srcPath = configReader.getSrcHdfsPath();
+                this.scanHarMember(new Path(srcPath), harFs);
+            } else {
+                FileSystem hdfsFS = configReader.getHdfsFS();
+                String srcPath = configReader.getSrcHdfsPath();
+                this.scanHdfsMember(new Path(srcPath), hdfsFS);
+            }
+        } catch (Exception e) {             // 这里直接捕获一个基类的异常，就不判断了
+            log.error("Scanning hdfs/har files occurs an exception.", e);
         }
 
-        for (int index = 0; index < fileStatusArry.size(); ++index) {
-            FileStatus fileStatus = fileStatusArry.get(index);
-            HdfsFileToCosTask task =
-                    new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, false);
-            threadPool.submit(task);
-        }
 
-        for (int index = 0; index < harFileStatusArray.size(); index++) {
-            FileStatus fileStatus = this.harFileStatusArray.get(index);
-            HdfsFileToCosTask task = new HdfsFileToCosTask(this.configReader, this.cosClient, fileStatus, true);
-            threadPool.submit(task);
-        }
-
-        threadPool.shutdown();
-        try {
-            threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.HOURS);
-        } catch (InterruptedException e) {
-            log.error("thread pool await occur a exception: " + e.getMessage());
-        }
         cosClient.shutdown();
     }
 

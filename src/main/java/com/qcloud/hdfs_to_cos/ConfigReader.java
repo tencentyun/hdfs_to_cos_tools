@@ -8,6 +8,7 @@ import java.util.Properties;
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class ConfigReader {
@@ -31,6 +32,7 @@ public class ConfigReader {
     private CommandLine cli = null;
     private Properties userInfoProp = null;
     private FileSystem hdfsFS = null;
+    private HarFileSystem harFs = null;
 
     public ConfigReader(CommandLine cli) {
         this.cli = cli;
@@ -53,12 +55,12 @@ public class ConfigReader {
             this.secretKey = getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
             this.bucket = getRequiredStringParam(OptionsArgsName.BUCKET, null);
             this.endpointSuffix = getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX, null);
-            if (null == this.endpointSuffix){
+            if (null == this.endpointSuffix) {
                 this.region = getRequiredStringParam(OptionsArgsName.REGION, "");
             }
             this.srcHdfsPath = getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
             this.destCosPath = getRequiredStringParam(OptionsArgsName.COS_PATH, null);
-            this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,                           
+            this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
             this.maxMultiPartUploadTaskNum = formatLongStr(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM, "4")).intValue();
@@ -90,6 +92,7 @@ public class ConfigReader {
 
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+        conf.set("fs.hdfs.impl.disable.cache", "true");
         conf.addResource(new Path(hdfsConfPath));
 
         try {
@@ -154,7 +157,7 @@ public class ConfigReader {
         }
         if (value == null) {
             value = defaultValue;
-            if(key.compareTo(OptionsArgsName.ENDPOINT_SUFFIX) == 0){                    // endpoint_suffix不是一个必选项
+            if (key.compareTo(OptionsArgsName.ENDPOINT_SUFFIX) == 0) {                    // endpoint_suffix不是一个必选项
                 return value;
             }
         }
@@ -234,6 +237,6 @@ public class ConfigReader {
     public boolean isSkipIfLengthMatch() {
         return skipIfLengthMatch;
     }
-    
-    
+
+
 }

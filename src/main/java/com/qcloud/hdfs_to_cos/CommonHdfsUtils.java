@@ -24,62 +24,34 @@ public class CommonHdfsUtils {
         }
     }
 
-    public static boolean isHarFile(FileStatus fileStatus) {
-        if (fileStatus.isDirectory() && fileStatus.getPath().toString().endsWith(".har")) {
-            return true;
+    public static Path convertToCosPath(ConfigReader configReader, Path hdfsFilePath) throws IOException {
+        if (null == hdfsFilePath) {
+            throw new NullPointerException("hdfs file path is null");
         }
 
-        return false;
-    }
-
-    /**
-     * @param hdfsFilePath
-     * @return
-     * @throws URISyntaxException
-     */
-    public static URI buildHarFsUri(Path hdfsFilePath) throws URISyntaxException {
-        String scheme = hdfsFilePath.toUri().getScheme();
-        String host = hdfsFilePath.toUri().getHost();
-        int port = hdfsFilePath.toUri().getPort();
-        String path = hdfsFilePath.toUri().getPath();
-
-        if (null == scheme || null == host || scheme.length() == 0 || host.length() == 0) {
-            return new URI("har://" + path);
-        }else{
-            return new URI("har://" + scheme + "-" + host + ":" + String.valueOf(port) + path);
+        String srcPath = new Path(configReader.getSrcHdfsPath()).toUri().getPath();
+        String hdfsFolderPath = srcPath;
+        if (configReader.getHdfsFS().getFileStatus(new Path(srcPath)).isFile()) {
+            hdfsFolderPath = srcPath.substring(0, srcPath.lastIndexOf("/"));
         }
-    }
-
-    /**
-     * 获取文件长度，单位为字节
-     *
-     * @param filePath 文件的本地路径
-     * @return 文件长度, 单位为字节
-     * @throws IOException
-     */
-    public static long getFileLength(FileSystem hdfsFS, String filePath) throws Exception {
-        Path path = new Path(filePath);
-        return hdfsFS.getFileStatus(path).getLen();
-    }
-
-    public static FSDataInputStream getFileContentBytes(FileSystem hdfsFS, String hdfsPath,
-                                                        long offset) throws Exception {
-        Path filePath = new Path(hdfsPath);
-        FSDataInputStream fstream = hdfsFS.open(filePath);
-        fstream.skip(offset);
-        return fstream;
-    }
-
-    public static FSDataInputStream getHarFileContentBytes(FileSystem hdfsFS, String harPath, long offset) throws IOException {
-        Path filePath = new Path(harPath);
-        HarFileSystem harFileSystem = new HarFileSystem(hdfsFS);
-        try {
-            harFileSystem.initialize(buildHarFsUri(new Path(harPath)), hdfsFS.getConf());
-        } catch (URISyntaxException e) {
-            throw new IOException(e.getMessage());
+        String filePath = hdfsFilePath.toUri().getPath();
+        String destPath = configReader.getDestCosPath();
+        if (destPath.endsWith("/")) {
+            destPath = destPath.substring(0, destPath.length() - 1);
         }
-        FSDataInputStream fstream = harFileSystem.open(filePath);
-        fstream.skip(offset);
-        return fstream;
+        if (configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()) {
+            // 是个文件
+            if(hdfsFolderPath.compareToIgnoreCase("/") == 0){
+                return new Path(destPath + filePath);
+            }else{
+                return new Path(filePath.replace(hdfsFolderPath, destPath));
+            }
+        } else {
+            if(hdfsFilePath.compareTo("/") == 0){
+                return new Path(destPath + filePath);
+            }else{
+                return new Path(filePath.replace(hdfsFolderPath, destPath) + "/");
+            }
+        }
     }
 }
