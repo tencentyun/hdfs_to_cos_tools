@@ -19,20 +19,13 @@ public class CommonHarUtils {
         return false;
     }
 
-    public static Path convertToCosPath(ConfigReader configReader, Path harFilePath) throws IOException {
+    public static Path convertToCosPath(ConfigReader configReader, Path harFilePath) throws IOException, URISyntaxException {
         if (null == harFilePath) {
             throw new NullPointerException("har file path is null");
         }
 
         HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
-        try {
-            harFileSystem.initialize(buildFsUri(harFilePath), configReader.getHdfsFS().getConf());
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-
+        harFileSystem.initialize(buildFsUri(harFilePath), configReader.getHdfsFS().getConf());
 
         String harFileFolderPath = harFileSystem.getHomeDirectory().toUri().getPath();
         String destPath = configReader.getDestCosPath();
