@@ -28,7 +28,6 @@ public class CommonHdfsUtils {
         if (null == hdfsFilePath) {
             throw new NullPointerException("hdfs file path is null");
         }
-
         String srcPath = new Path(configReader.getSrcHdfsPath()).toUri().getPath();
         String hdfsFolderPath = srcPath;
         if (configReader.getHdfsFS().getFileStatus(new Path(srcPath)).isFile()) {
