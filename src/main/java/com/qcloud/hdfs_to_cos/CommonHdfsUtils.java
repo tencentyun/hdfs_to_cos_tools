@@ -41,15 +41,15 @@ public class CommonHdfsUtils {
         }
         if (configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()) {
             // 是个文件
-            if(hdfsFolderPath.compareToIgnoreCase("/") == 0){
+            if (hdfsFolderPath.compareToIgnoreCase("/") == 0) {
                 return new Path(destPath + filePath);
-            }else{
+            } else {
                 return new Path(filePath.replace(hdfsFolderPath, destPath));
             }
         } else {
-            if(hdfsFilePath.compareTo("/") == 0){
+            if (hdfsFilePath.compareTo(new Path("/")) == 0) {
                 return new Path(destPath + filePath);
-            }else{
+            } else {
                 return new Path(filePath.replace(hdfsFolderPath, destPath) + "/");
             }
         }
