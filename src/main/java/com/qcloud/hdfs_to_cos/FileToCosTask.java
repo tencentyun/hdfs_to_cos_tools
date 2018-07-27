@@ -332,7 +332,7 @@ public class FileToCosTask implements Runnable {
         } catch (IOException e) {
             log.error("save point file occur an exception: " + e.getMessage());
         } finally {
-            if (null == bw) {
+            if (null != bw) {
                 try {
                     bw.close();
                 } catch (IOException e) {
@@ -370,7 +370,7 @@ public class FileToCosTask implements Runnable {
         for (int i = 0; i < kMaxRetryNum; i++) {
             try {
                 initiateMultipartUploadResult = this.cosClient.initiateMultipartUpload(initiateMultipartUploadRequest);
-                this.saveUploadId(uploadId);
+                this.saveUploadId(initiateMultipartUploadResult.getUploadId());
                 break;
             } catch (CosServiceException e) {
                 log.error("init multipart upload failure. cos path: " + this.cosPath + " try num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
@@ -418,6 +418,7 @@ public class FileToCosTask implements Runnable {
                 this.CreateFolder();
             }
         } catch (Exception e) {
+            log.error("upload file occurs an exception: ", e);
         } finally {
         }
     }
