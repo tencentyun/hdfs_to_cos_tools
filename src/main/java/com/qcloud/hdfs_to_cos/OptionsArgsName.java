@@ -19,6 +19,7 @@ public class OptionsArgsName {
     public static final String SKIP_IF_LENGTH_MATCH = "skip_if_len_match";
     public static final String MAX_TASK_NUM = "max_task_num"; // 并发线程数
     public static final String MAX_MULTIPART_UPLOAD_TASK_NUM = "max_multipart_upload_task_num"; // 分块上传的线程数
+    public static final String UPLOAD_PART_SIZE = "max_upload_part_size";
 
     public static Options getAllSupportOption() {
         Options options = new Options();
@@ -34,6 +35,7 @@ public class OptionsArgsName {
         options.addOption(getCosInfoFileOption());
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
+        options.addOption(getPartSize());
         return options;
     }
 
@@ -111,4 +113,8 @@ public class OptionsArgsName {
                 .desc("skip upload if hadoop file length match cos").build();
     }
 
+    public static Option getPartSize() {
+        return Option.builder(UPLOAD_PART_SIZE).longOpt(UPLOAD_PART_SIZE)
+                .desc("the maximum size of a single block when use the multipart upload").build();
+    }
 }

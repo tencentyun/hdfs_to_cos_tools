@@ -27,6 +27,7 @@ public class ConfigReader {
     private boolean skipIfLengthMatch = false;
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
+    private int partSize = 0;
     private static final int DEFAULT_PART_SIZE = 32 * 1024 * 1024;
 
     private CommandLine cli = null;
@@ -67,7 +68,11 @@ public class ConfigReader {
             if (cli.hasOption(OptionsArgsName.SKIP_IF_LENGTH_MATCH)) {
                 this.skipIfLengthMatch = true;
             }
-
+            if (cli.hasOption(OptionsArgsName.UPLOAD_PART_SIZE)) {
+                this.partSize = formatLongStr(
+                        OptionsArgsName.UPLOAD_PART_SIZE,
+                        getRequiredStringParam(OptionsArgsName.UPLOAD_PART_SIZE, String.valueOf(this.DEFAULT_PART_SIZE))).intValue();
+            }
         } catch (IllegalArgumentException e) {
             this.initConfigFlag = false;
             this.initErrMsg = String.format(e.getMessage());
@@ -227,7 +232,11 @@ public class ConfigReader {
     }
 
     public int getPartSize() {
-        return DEFAULT_PART_SIZE;
+        if (this.partSize > 0) {
+            return this.partSize;
+        } else {
+            return DEFAULT_PART_SIZE;
+        }
     }
 
     public FileSystem getHdfsFS() {
