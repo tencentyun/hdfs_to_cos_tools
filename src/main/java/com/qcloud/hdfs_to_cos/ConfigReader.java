@@ -28,7 +28,7 @@ public class ConfigReader {
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
     private int partSize = 0;
-    private static final int DEFAULT_PART_SIZE = 32 * 1024 * 1024;
+    private static final int DEFAULT_PART_SIZE = 2 * 1024 * 1024;
 
     private CommandLine cli = null;
     private Properties userInfoProp = null;

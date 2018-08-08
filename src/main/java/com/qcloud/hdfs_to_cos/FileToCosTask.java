@@ -21,7 +21,7 @@ public class FileToCosTask implements Runnable {
     private static final long MAX_PART_SIZE = 2 * 1024 * 1024 * 1024L;            // 2G
     private static final long MAX_PART_NUM = 10000L;
     private static final long MAX_FILE_SIZE = MAX_PART_SIZE * MAX_PART_NUM;
-    private static final long MULTIPART_UPLOAD_THRESHOLD = 64 * 1024 * 1024L;
+    private static final long MULTIPART_UPLOAD_THRESHOLD = 128 * 1024 * 1024L;
 
     private final int kMaxRetryNum = 3;
     private final int kRetryInterval = 3000;                                    // 重试间隔时间
@@ -165,13 +165,15 @@ public class FileToCosTask implements Runnable {
             }
         }
         // 然后开始上传
-        log.info("cospath: " + cosPath + ", fileSize: " + fileSize + ", partSize:" + partSize);
+        log.info("cos path: " + cosPath + ", fileSize: " + fileSize + ", partSize:" + partSize);
         List<Future<PartETag>> allUploadPartTasks = new ArrayList<Future<PartETag>>();
         int threadNum = this.configReader.getMaxUploadPartTaskNum();
         ExecutorService service = Executors.newFixedThreadPool(threadNum);
         Semaphore tmpSemaphore = new Semaphore(threadNum);
-        for (int partNum = 1, pos = 0; pos < fileSize; partNum++) {
+        long pos = 0;
+        for (int partNum = 1; pos < fileSize; partNum++) {
             partSize = Math.min(partSize, fileSize - pos);
+            log.info("part size : " + partSize);
             if (existedParts.containsKey(partNum)) {
                 log.info("part has already been uploaded, cos path: " + cosPath + " part num: " + partNum + " pos: " + pos + " part size: " + partSize);
                 pos += partSize;
@@ -191,6 +193,7 @@ public class FileToCosTask implements Runnable {
             UploadPartTask uploadPartTask = new UploadPartTask(this.fileSystem, this.fileStatus.getPath(), this.cosPath, uploadId, partNum, pos, partSize, this.cosClient, tmpSemaphore, this.configReader);
             allUploadPartTasks.add(service.submit(uploadPartTask));
             pos += partSize;
+            log.info("pos : " + pos);
         }
 
         try {

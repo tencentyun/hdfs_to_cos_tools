@@ -36,6 +36,8 @@ public class OptionsArgsName {
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
         options.addOption(getPartSize());
+        options.addOption(getMaxTaskNumOption());
+        options.addOption(getMaxMultiPartUploadTaskNumOption());
         return options;
     }
 
@@ -74,7 +76,7 @@ public class OptionsArgsName {
     }
 
     public static Option getMaxTaskNumOption() {
-        return Option.builder(MAX_TASK_NUM).argName(MAX_TASK_NUM).hasArg().desc("max parallel task num to upload file default 4")
+        return Option.builder(MAX_TASK_NUM).longOpt(MAX_TASK_NUM).hasArg().desc("max parallel task num to upload file default 4")
                 .build();
     }
 
@@ -114,7 +116,7 @@ public class OptionsArgsName {
     }
 
     public static Option getPartSize() {
-        return Option.builder(UPLOAD_PART_SIZE).longOpt(UPLOAD_PART_SIZE)
+        return Option.builder(UPLOAD_PART_SIZE).longOpt(UPLOAD_PART_SIZE).hasArg()
                 .desc("the maximum size of a single block when use the multipart upload").build();
     }
 }
