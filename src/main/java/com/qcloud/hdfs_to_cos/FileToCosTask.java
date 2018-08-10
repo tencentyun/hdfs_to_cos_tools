@@ -422,6 +422,7 @@ public class FileToCosTask implements Runnable {
             }
         } catch (Exception e) {
             log.error("upload file occurs an exception: ", e);
+            Statistics.instance.addUploadFileFail();
         } finally {
         }
     }
