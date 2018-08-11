@@ -35,9 +35,9 @@ public class OptionsArgsName {
         options.addOption(getCosInfoFileOption());
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
-        options.addOption(getPartSize());
-        options.addOption(getMaxTaskNumOption());
-        options.addOption(getMaxMultiPartUploadTaskNumOption());
+//        options.addOption(getPartSize());
+//        options.addOption(getMaxTaskNumOption());
+//        options.addOption(getMaxMultiPartUploadTaskNumOption());
         return options;
     }
 

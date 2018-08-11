@@ -43,13 +43,13 @@ public class CommonHdfsUtils {
             if (hdfsFolderPath.compareToIgnoreCase("/") == 0) {
                 return new Path(destPath + filePath);
             } else {
-                return new Path(filePath.replace(hdfsFolderPath, destPath));
+                return new Path(filePath.replaceFirst(hdfsFolderPath, destPath));
             }
         } else {
             if (hdfsFilePath.compareTo(new Path("/")) == 0) {
                 return new Path(destPath + filePath);
             } else {
-                return new Path(filePath.replace(hdfsFolderPath, destPath) + "/");
+                return new Path(filePath.replaceFirst(hdfsFolderPath, destPath) + "/");
             }
         }
     }

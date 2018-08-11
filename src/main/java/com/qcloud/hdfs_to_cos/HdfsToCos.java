@@ -80,11 +80,9 @@ public class HdfsToCos {
                 harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()), hdfsFS.getConf());
                 scanHarMember(member.getPath(), harFS);
             } else {
+                this.submitTask(this.buildHdfsFileToCosTask(member));
                 if (member.isDirectory()) {
                     scanHdfsMember(member.getPath(), hdfsFS);
-                }
-                if(member.isFile()){
-                    this.submitTask(this.buildHdfsFileToCosTask(member));
                 }
             }
         }

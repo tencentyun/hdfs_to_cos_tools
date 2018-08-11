@@ -129,7 +129,7 @@ public class FileToCosTask implements Runnable {
                 this.cosClient.putObject(putObjectRequest);
                 return;
             } catch (CosServiceException e) {
-                log.error("upload single file failure. retry_num:" + String.valueOf(i) + " msg:" + e.getMessage() + " retcode: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
+                log.error("upload single file failure. retry_num:" + String.valueOf(i) + " msg:" + e.getMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
                 try {
                     Thread.sleep(this.kRetryInterval);
                 } catch (InterruptedException e1) {
@@ -243,6 +243,9 @@ public class FileToCosTask implements Runnable {
                 inputStream = new ByteArrayInputStream(new byte[0]);
                 ObjectMetadata metadata = new ObjectMetadata();
                 metadata.setContentLength(0);
+                if(!this.cosPath.endsWith("/")){
+                    this.cosPath += "/";
+                }
                 PutObjectRequest putObjectRequest = new PutObjectRequest(configReader.getBucket(), this.cosPath, inputStream, metadata);
                 this.cosClient.putObject(putObjectRequest);
                 return;
