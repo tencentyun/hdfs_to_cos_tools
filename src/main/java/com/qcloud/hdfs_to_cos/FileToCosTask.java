@@ -1,6 +1,7 @@
 package com.qcloud.hdfs_to_cos;
 
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;
 import com.qcloud.cos.model.*;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -152,7 +153,6 @@ public class FileToCosTask implements Runnable {
 
     protected void uploadMultipartWithRetry() throws Exception {
         String uploadId = this.buildUploadId();
-
         Map<Integer, PartSummary> existedParts = this.identifyExistingPartsForResume(uploadId);
 
         // 先规整partSize
@@ -234,7 +234,7 @@ public class FileToCosTask implements Runnable {
         throw new Exception("upload file failure, cos path: " + this.cosPath + " file path: " + this.fileStatus.getPath().toString());
     }
 
-    protected void createFolderWithRetry() {
+    protected void createFolderWithRetry() throws Exception {
         this.checkInternalMember();
 
         for (int i = 0; i < this.kMaxRetryNum; i++) {
@@ -248,7 +248,6 @@ public class FileToCosTask implements Runnable {
                 }
                 PutObjectRequest putObjectRequest = new PutObjectRequest(configReader.getBucket(), this.cosPath, inputStream, metadata);
                 this.cosClient.putObject(putObjectRequest);
-                Statistics.instance.addCreateFolderOk();
                 return;
             } catch (CosServiceException e) {
                 log.error("create folder failure, retry num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
@@ -268,8 +267,8 @@ public class FileToCosTask implements Runnable {
                 }
             }
         }
-        Statistics.instance.addCreateFolderFail();
-        log.error("create cos folder failed. cos path: " + this.cosPath);
+
+        throw new Exception("create folder failure, cos path: " + this.cosPath + " folder path: " + this.fileStatus.getPath().toString());
     }
 
     protected void CreateFolder() {
@@ -278,17 +277,19 @@ public class FileToCosTask implements Runnable {
         try {
             if (!this.isCosFolderExist()) {
                 this.createFolderWithRetry();
+                Statistics.instance.addCreateFolderOk();
+                String taskInfo = String.format("[create folder] [folder_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, "success");
+                log.info(taskInfo);
+                String printlnStr = String.format("[ok] [folder path: %s]", this.fileStatus.getPath().toString());
+                System.out.println(printlnStr);
             } else {
                 log.info("folder already exist. cos path: " + this.cosPath);
             }
-            String taskInfo = String.format("[create folder] [file_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, "success");
-            log.info(taskInfo);
-            String printlnStr = String.format("[ok] [file_path: %s]", this.fileStatus.getPath().toString());
-            System.out.println(printlnStr);
         } catch (Exception e) {
-            String taskInfo = String.format("[create folder] [file_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, e.getMessage());
+            String taskInfo = String.format("[create folder] [folder_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, e.getMessage());
             log.error(taskInfo);
-            String printlnStr = String.format("[create folder] [file_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
+            Statistics.instance.addCreateFolderFail();
+            String printlnStr = String.format("[failed] [folder_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
             System.out.println(printlnStr);
         }
     }
@@ -425,6 +426,8 @@ public class FileToCosTask implements Runnable {
             }
         } catch (Exception e) {
             log.error("upload file occurs an exception: ", e);
+            String printlnStr = String.format("[failed] [file_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
+            System.out.println(printlnStr);
             Statistics.instance.addUploadFileFail();
         } finally {
         }
