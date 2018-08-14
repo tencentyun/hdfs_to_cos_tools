@@ -33,24 +33,15 @@ public class CommonHdfsUtils {
         if (configReader.getHdfsFS().getFileStatus(new Path(srcPath)).isFile()) {
             hdfsFolderPath = srcPath.substring(0, srcPath.lastIndexOf("/")) + "/";
         }
-        String filePath = hdfsFilePath.toUri().getPath();
-        String destPath = configReader.getDestCosPath();
+        String filePath = hdfsFilePath.toUri().getPath();           // 文件的实际路径
+        String destPath = configReader.getDestCosPath();            // COS上的目的路径
         if (!destPath.endsWith("/")) {
             destPath = destPath + "/";
         }
         if (configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()) {
-            // 是个文件
-            if (hdfsFolderPath.compareToIgnoreCase("/") == 0) {
-                return new Path(destPath + filePath);
-            } else {
-                return new Path(filePath.replaceFirst(hdfsFolderPath, destPath));
-            }
+            return new Path(filePath.replaceFirst(hdfsFolderPath, destPath));
         } else {
-            if (hdfsFilePath.compareTo(new Path("/")) == 0) {
-                return new Path(destPath + filePath);
-            } else {
-                return new Path(filePath.replaceFirst(hdfsFolderPath, destPath) + "/");
-            }
+            return new Path(filePath.replaceFirst(hdfsFolderPath, destPath) + "/");
         }
     }
 }

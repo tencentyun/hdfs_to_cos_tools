@@ -248,6 +248,7 @@ public class FileToCosTask implements Runnable {
                 }
                 PutObjectRequest putObjectRequest = new PutObjectRequest(configReader.getBucket(), this.cosPath, inputStream, metadata);
                 this.cosClient.putObject(putObjectRequest);
+                Statistics.instance.addCreateFolderOk();
                 return;
             } catch (CosServiceException e) {
                 log.error("create folder failure, retry num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
@@ -282,13 +283,11 @@ public class FileToCosTask implements Runnable {
             }
             String taskInfo = String.format("[create folder] [file_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, "success");
             log.info(taskInfo);
-            Statistics.instance.addCreateFolderOk();
             String printlnStr = String.format("[ok] [file_path: %s]", this.fileStatus.getPath().toString());
             System.out.println(printlnStr);
         } catch (Exception e) {
             String taskInfo = String.format("[create folder] [file_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, e.getMessage());
             log.error(taskInfo);
-            Statistics.instance.addCreateFolderFail();
             String printlnStr = String.format("[create folder] [file_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
             System.out.println(printlnStr);
         }
