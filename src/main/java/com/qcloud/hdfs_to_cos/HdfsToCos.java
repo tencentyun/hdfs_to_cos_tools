@@ -176,8 +176,6 @@ public class HdfsToCos {
             log.error("Scanning hdfs/har files occurs an exception.", e);
         }
 
-
         cosClient.shutdown();
     }
-
 }

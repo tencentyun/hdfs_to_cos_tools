@@ -31,12 +31,12 @@ public class CommonHdfsUtils {
         String srcPath = new Path(configReader.getSrcHdfsPath()).toUri().getPath();
         String hdfsFolderPath = srcPath;
         if (configReader.getHdfsFS().getFileStatus(new Path(srcPath)).isFile()) {
-            hdfsFolderPath = srcPath.substring(0, srcPath.lastIndexOf("/"));
+            hdfsFolderPath = srcPath.substring(0, srcPath.lastIndexOf("/")) + "/";
         }
         String filePath = hdfsFilePath.toUri().getPath();
         String destPath = configReader.getDestCosPath();
-        if (destPath.endsWith("/")) {
-            destPath = destPath.substring(0, destPath.length() - 1);
+        if (!destPath.endsWith("/")) {
+            destPath = destPath + "/";
         }
         if (configReader.getHdfsFS().getFileStatus(new Path(filePath)).isFile()) {
             // 是个文件

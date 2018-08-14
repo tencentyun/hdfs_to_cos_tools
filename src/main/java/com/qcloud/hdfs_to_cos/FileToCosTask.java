@@ -267,6 +267,7 @@ public class FileToCosTask implements Runnable {
                 }
             }
         }
+        Statistics.instance.addCreateFolderFail();
         log.error("create cos folder failed. cos path: " + this.cosPath);
     }
 

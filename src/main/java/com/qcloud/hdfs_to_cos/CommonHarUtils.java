@@ -35,9 +35,9 @@ public class CommonHarUtils {
 
         String filePath = harFilePath.toUri().getPath();
         if (harFileSystem.getFileStatus(new Path(filePath)).isFile()) {
-            return new Path(filePath.replace(harFileFolderPath, destPath));
+            return new Path(filePath.replaceFirst(harFileFolderPath, destPath));
         } else {
-            return new Path(filePath.replace(harFileFolderPath, destPath) + "/");
+            return new Path(filePath.replaceFirst(harFileFolderPath, destPath) + "/");
         }
 
     }
