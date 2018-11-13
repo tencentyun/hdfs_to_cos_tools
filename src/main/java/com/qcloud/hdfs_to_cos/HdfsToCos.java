@@ -25,6 +25,8 @@ public class HdfsToCos {
     private BlockingQueue<FileToCosTask> taskBlockingQueue = null;
     private COSClient cosClient = null;
 
+    private String configCheckMsg;
+
     public HdfsToCos(ConfigReader configReader, BlockingQueue<FileToCosTask> taskBlockingQueue, COSClient cosClient) {
         this.configReader = configReader;
         this.taskBlockingQueue = taskBlockingQueue;
@@ -128,22 +130,29 @@ public class HdfsToCos {
     private boolean checkCosClientLegal() {
         GetObjectMetadataRequest statRequest =
                 new GetObjectMetadataRequest(this.configReader.getBucket(), "/");
-        for (int i = 0; i < 2; ++i) {
+
+        // 首先检查Bucket是否存在
+        for (int i = 0; i < 2; i++) {
             try {
-                cosClient.getObjectMetadata(statRequest);
+                boolean isBucketExist = this.cosClient.doesBucketExist(this.configReader.getBucket());
+                if (!isBucketExist) {
+                    this.configCheckMsg = new String("The specified bucket in the configuration does not exist.\n"
+                            + "Please check if the appid, bucket or endpoint configuration in the configuration is correct.");
+                    return false;
+                }
                 log.debug("checkCosClient success!");
                 return true;
-            } catch (CosServiceException cse) {
-                log.error("catch CosServiceException, error msg:" + cse.getMessage());
-                continue;
-            } catch (CosClientException cse) {
-                log.error("catch CosClientException, error msg:" + cse.getMessage());
-                continue;
-            } catch (Exception e) {
-                log.error("catch unkow exception:" + e.toString());
+            } catch (CosServiceException e) {
+                if (e.getStatusCode() == 403) {
+                    // 鉴权不过，检查secret id和secret key
+                    this.configCheckMsg = new String("The provided SecretID or Secret key are invalid.\n"
+                            + "Please check if ak and sk are configured correctly.");
+                    break;
+                }
                 continue;
             }
         }
+
         return false;
     }
 
@@ -151,11 +160,8 @@ public class HdfsToCos {
     public void run() {
         if (!checkCosClientLegal()) {
             StringBuilder errMsgBuilder =
-                    new StringBuilder("Get bucket info error! please check your config info\n");
-            errMsgBuilder.append("These clues may help you.\n");
-            errMsgBuilder.append("1. check appid, ak, sk\n");
-            errMsgBuilder.append("2. check bucket and region info\n");
-            errMsgBuilder.append("3. check your machine time");
+                    new StringBuilder("Configuration information verification error:\n");
+            errMsgBuilder.append(this.configCheckMsg);
             System.err.println(errMsgBuilder.toString());
             cosClient.shutdown();
             return;
