@@ -14,15 +14,17 @@ public class Statistics {
     private AtomicLong uploadFileOkNum = new AtomicLong();
     private AtomicLong uploadFileFailedNum = new AtomicLong();
     private AtomicLong skipFileNum = new AtomicLong();
-    private Date startTime = new Date();
+    private Date startTime;
 
     public static final Statistics instance = new Statistics();
 
-    private Statistics() {}
+    private Statistics() {
+    }
 
     public void start() {
+        this.startTime = new Date();
     }
-    
+
     public void addCreateFolderOk() {
         this.createFolderOkNum.incrementAndGet();
     }
@@ -38,7 +40,7 @@ public class Statistics {
     public void addUploadFileFail() {
         this.uploadFileFailedNum.incrementAndGet();
     }
-    
+
     public void addSkipFile() {
         this.skipFileNum.incrementAndGet();
     }
@@ -50,8 +52,8 @@ public class Statistics {
                 this.createFolderOkNum.get(), this.createFolderFailedNum.get());
         log.info(infoMsg);
         System.out.println(infoMsg);
-        
-        
+
+
         infoMsg = String.format("[File Operation Result: [%d(sum)/ %d(ok) / %d(fail) / %d(skip)]",
                 this.uploadFileOkNum.get() + this.uploadFileFailedNum.get() + this.skipFileNum.get(),
                 this.uploadFileOkNum.get(), this.uploadFileFailedNum.get(), this.skipFileNum.get());

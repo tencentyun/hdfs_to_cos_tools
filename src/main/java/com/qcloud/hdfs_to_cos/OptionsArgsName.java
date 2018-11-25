@@ -5,19 +5,20 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 public class OptionsArgsName {
-    public static final String HELP = "h";
-    public static final String APPID = "appid";
-    public static final String BUCKET = "bucket";
-    public static final String REGION = "region";
+    public static final String HELP = "h";                                      // 帮助选项
+    public static final String APPID = "appid";                                 // appid
+    public static final String BUCKET = "bucket";                               // bucket
+    public static final String REGION = "region";                               // region
     public static final String ENDPOINT_SUFFIX = "endpoint_suffix";             // 这个是可选项
-    public static final String SECRET_ID = "ak";
-    public static final String SECRET_KEY = "sk";
-    public static final String HDFS_PATH = "hdfs_path";
-    public static final String COS_PATH = "cos_path";
-    public static final String COS_CONF_FILE = "cos_info_file";
-    public static final String HDFS_CONF_FILE = "hdfs_conf_file";
-    public static final String SKIP_IF_LENGTH_MATCH = "skip_if_len_match";
-    public static final String MAX_TASK_NUM = "max_task_num"; // 并发线程数
+    public static final String SECRET_ID = "ak";                                // secretId
+    public static final String SECRET_KEY = "sk";                               // secretKey
+    public static final String HDFS_PATH = "hdfs_path";                         // 要迁移的HDFS的路径
+    public static final String COS_PATH = "cos_path";                           // cos上的文件路径
+    public static final String COS_CONF_FILE = "cos_info_file";                 // cos的配置文件路径
+    public static final String HDFS_CONF_FILE = "hdfs_conf_file";               // hdfs的配置文件路径
+    public static final String SKIP_IF_LENGTH_MATCH = "skip_if_len_match";      // 是否本地和COS上的文件名相同且长度一致，就跳过
+    public static final String FORCE_CHECK_MD5SUM = "force_check_md5sum";       // 上传文件检查时，是否强制检查md5sum
+    public static final String MAX_TASK_NUM = "max_task_num";                   // 并发线程数
     public static final String MAX_MULTIPART_UPLOAD_TASK_NUM = "max_multipart_upload_task_num"; // 分块上传的线程数
     public static final String UPLOAD_PART_SIZE = "max_upload_part_size";
 
@@ -35,9 +36,7 @@ public class OptionsArgsName {
         options.addOption(getCosInfoFileOption());
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
-//        options.addOption(getPartSize());
-//        options.addOption(getMaxTaskNumOption());
-//        options.addOption(getMaxMultiPartUploadTaskNumOption());
+        options.addOption(getForceCheckMD5Sum());
         return options;
     }
 
@@ -113,6 +112,11 @@ public class OptionsArgsName {
     public static Option getSkipIfLenMatch() {
         return Option.builder(SKIP_IF_LENGTH_MATCH).longOpt(SKIP_IF_LENGTH_MATCH)
                 .desc("skip upload if hadoop file length match cos").build();
+    }
+
+    public static Option getForceCheckMD5Sum() {
+        return Option.builder(FORCE_CHECK_MD5SUM).longOpt(FORCE_CHECK_MD5SUM)
+                .desc("Enable the check MD5Sum of a uploaded file. Default disable.").build();
     }
 
     public static Option getPartSize() {

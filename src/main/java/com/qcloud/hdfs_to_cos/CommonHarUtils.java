@@ -39,7 +39,6 @@ public class CommonHarUtils {
         } else {
             return new Path(filePath.replaceFirst(harFileFolderPath, destPath) + "/");
         }
-
     }
 
     public static URI buildFsUri(Path harFilePath) throws URISyntaxException {

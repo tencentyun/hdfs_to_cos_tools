@@ -1,7 +1,6 @@
 package com.qcloud.hdfs_to_cos;
 
 import com.qcloud.cos.COSClient;
-import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;
 import com.qcloud.cos.model.*;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -20,24 +19,41 @@ import java.util.concurrent.*;
 public class FileToCosTask implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(FileToCosTask.class);
     private static final long MAX_PART_SIZE = 2 * 1024 * 1024 * 1024L;            // 2G
-    private static final long MAX_PART_NUM = 10000L;
-    private static final long MAX_FILE_SIZE = MAX_PART_SIZE * MAX_PART_NUM;
-    private static final long MULTIPART_UPLOAD_THRESHOLD = 128 * 1024 * 1024L;
+    private static final long MAX_PART_NUM = 10000L;                              // 最多10000块
+    private static final long MAX_FILE_SIZE = MAX_PART_SIZE * MAX_PART_NUM;       // 能够支持的最大文件大小
+    private static final long MULTIPART_UPLOAD_THRESHOLD = 128 * 1024 * 1024L;    // 超过128MB以后采用分块上传
 
     private final int kMaxRetryNum = 3;
-    private final int kRetryInterval = 3000;                                    // 重试间隔时间
+    private final int kRetryInterval = 3000;                                    // 重试间隔时间，3秒
 
     protected ConfigReader configReader = null;
     protected COSClient cosClient = null;
     protected FileStatus fileStatus = null;
     protected FileSystem fileSystem = null;
+    protected String md5sum = null;         // 文件的md5sum
     protected String cosPath = null;
 
-    public FileToCosTask(ConfigReader configReader, COSClient cosClient, FileStatus fileStatus, FileSystem fileSystem, String cosPath) {
+    public FileToCosTask(
+            ConfigReader configReader,
+            COSClient cosClient,
+            FileStatus fileStatus,
+            FileSystem fileSystem,
+            String cosPath) {
+        this(configReader, cosClient, fileStatus, fileSystem, null, cosPath);
+    }
+
+    public FileToCosTask(
+            ConfigReader configReader,
+            COSClient cosClient,
+            FileStatus fileStatus,
+            FileSystem fileSystem,
+            String md5sum,
+            String cosPath) {
         this.configReader = configReader;
         this.cosClient = cosClient;
         this.fileStatus = fileStatus;
         this.fileSystem = fileSystem;
+        this.md5sum = md5sum;
         this.cosPath = cosPath;
     }
 
@@ -66,6 +82,71 @@ public class FileToCosTask implements Runnable {
         }
     }
 
+    /**
+     * 根据文件长度判断COS文件是否存在
+     *
+     * @return 如果COS文件存在，则返回true，否则返回false
+     */
+    protected boolean checkFileExistsWithLength() {
+        this.checkInternalMember();
+        log.debug("check if file:{} exists with length.", this.fileStatus.getPath().toString());
+        try {
+            GetObjectMetadataRequest metadataRequest = new GetObjectMetadataRequest(configReader.getBucket(), cosPath);
+            ObjectMetadata metadata = this.cosClient.getObjectMetadata(metadataRequest);
+            long cosFileSize = metadata.getContentLength();
+            long localFileSize = this.fileStatus.getLen();
+
+            if (cosFileSize == localFileSize) {
+                return true;
+            }
+        } catch (Exception e) {
+            log.debug("file is not exist. bucket: " + configReader.getBucket()
+                    + "," + "cos path: " + cosPath + "msg: " + e.getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * 根据文件的长度和MD5值来判断COS文件是否存在
+     *
+     * @return 如果COS文件存在，则返回true，否则返回false
+     */
+    protected boolean checkFileExistsWithMD5Sum() {
+        this.checkInternalMember();
+        log.debug("check if file:{} exists with MD5 checksum.", this.fileStatus.getPath().toString());
+        try {
+            GetObjectMetadataRequest metadataRequest = new GetObjectMetadataRequest(configReader.getBucket(), cosPath);
+            ObjectMetadata metadata = this.cosClient.getObjectMetadata(metadataRequest);
+            long cosFileSize = metadata.getContentLength();
+            long localFileSize = this.fileStatus.getLen();
+            // 首先要满足长度是一致的
+            if (cosFileSize == localFileSize) {
+                if (this.md5sum != null) {
+                    if (this.md5sum.compareToIgnoreCase(metadata.getETag()) == 0) {
+                        // 这里单文件是可以校验MD5值的
+                        return true;
+                    }
+                } else {
+                    // 没有给文件的原始MD5sum，这里如果开启了强制校验MD5值的话，就应该认为不存在
+                    if (configReader.isForceCheckMD5Sum()) {
+                        return false;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("file is not exist. bucket: " + configReader.getBucket()
+                    + "," + "cos path: " + cosPath + "msg: " + e.getMessage());
+        }
+
+        return false;
+    }
+
+    /**
+     * 根据文件长度判断是否需要跳过该文件的上传
+     *
+     * @return
+     */
     protected boolean ifSkipUploadFile() {
         this.checkInternalMember();
 
@@ -73,21 +154,8 @@ public class FileToCosTask implements Runnable {
             return false;
         }
 
-        //对比文件是否一致
-        try {
-            GetObjectMetadataRequest statRequest = new GetObjectMetadataRequest(configReader.getBucket(), cosPath);
-            ObjectMetadata metadata = cosClient.getObjectMetadata(statRequest);
-            long cosFileSize = metadata.getContentLength();
-            long localFileSize = this.fileStatus.getLen();
-            if (cosFileSize == localFileSize) {
-                log.info("local file len equal to cos. skip upload. file path: " + fileStatus.getPath().toString());
-                Statistics.instance.addSkipFile();
-                return true;
-            }
-        } catch (Exception e) {
-            log.error("file is not exist. bucket: " + configReader.getBucket() + "," + "cos path: " + cosPath + "msg: " + e.getMessage());
-        }
-        return false;
+        // 根据文件长度判断是否需要跳过文件
+        return this.checkFileExistsWithLength();
     }
 
     protected void UploadFile() throws Exception {
@@ -95,6 +163,9 @@ public class FileToCosTask implements Runnable {
 
         //判断是否需要跳过文件
         if (this.ifSkipUploadFile()) {
+            log.info("file:{} already exists on COS. Skip to upload it.",
+                    this.fileStatus.getPath().toString());
+            Statistics.instance.addSkipFile();
             return;
         }
 
@@ -102,42 +173,120 @@ public class FileToCosTask implements Runnable {
         if (fileSize > FileToCosTask.MAX_FILE_SIZE) {
             throw new IOException("exceed max support file size, current file size:" + fileSize + " max file size: " + FileToCosTask.MAX_FILE_SIZE);
         }
+
+        // 文件完整性校验
+        boolean isUploadSuccess = false;
         if (fileSize <= FileToCosTask.MULTIPART_UPLOAD_THRESHOLD) {
-            this.uploadSingleFileWithRetry();
+            log.debug("upload file:{} by using single file mode.", this.fileStatus.getPath().toString());
+            isUploadSuccess = this.uploadSingleFileWithRetry();
+            // 单文件上传需要校验文件的MD5值
+            if (configReader.isForceCheckMD5Sum()) {
+                isUploadSuccess &= this.checkFileExistsWithMD5Sum();
+            } else {
+                // 没开启MD5校验，则至少也要校验文件的长度信息
+                isUploadSuccess &= this.checkFileExistsWithLength();
+            }
         } else {
-            this.uploadMultipartWithRetry();
+            log.debug("upload file:{} by using multipart upload mode.", this.fileStatus.getPath().toString());
+            isUploadSuccess = this.uploadMultipartWithRetry();
+            // 分块上传文件需要校验文件的长度
+            isUploadSuccess &= this.checkFileExistsWithLength();
         }
 
-        String taskInfo = String.format("[upload file success] [file path: %s] [cos path: %s]", this.fileStatus.getPath().toString(), this.cosPath.toString());
-        log.info(taskInfo);
-        Statistics.instance.addUploadFileOk();
-        String printlnStr =
-                String.format("[ok] [file path: %s]", this.fileStatus.getPath().toString());
-        System.out.println(printlnStr);
+        if (isUploadSuccess) {
+            // 检查文件确实已经上传成功了
+            String taskInfo = String.format("[upload file successfully] [file path: %s] [cos path: %s]",
+                    this.fileStatus.getPath().toString(), this.cosPath.toString());
+            log.info(taskInfo);
+            Statistics.instance.addUploadFileOk();
+            String printlnStr =
+                    String.format("[success] [file path: %s]", this.fileStatus.getPath().toString());
+            System.out.println(printlnStr);
+        } else {
+            String taskInfo = String.format("[upload file failed] [file path: %s] [cos path: %s]",
+                    this.fileStatus.getPath().toString(), this.cosPath);
+            log.error(taskInfo);
+            Statistics.instance.addUploadFileFail();
+            String printlnStr = String.format("[failure] [file path: %s]", this.fileStatus.getPath(), this.cosPath);
+            System.err.println(printlnStr);
+        }
     }
 
-    private void uploadSingleFileWithRetry() throws Exception {
+    private boolean uploadSingleFileWithRetry() throws Exception {
         this.checkInternalMember();
+        boolean isUploadSuccess = false;
         for (int i = 0; i < this.kMaxRetryNum; i++) {
             InputStream fStream = null;
             try {
-                fStream = this.fileSystem.open(this.fileStatus.getPath());
+                // 如果开启了强制校验MD5，那么首先要检查文件的MD5值
+
+                if (configReader.isForceCheckMD5Sum() && null == this.md5sum) {
+                    fStream = this.fileSystem.open(this.fileStatus.getPath());
+                    fStream.skip(0);
+                    try {
+                        this.md5sum = Utils.calInputStreamCheckSum(fStream, "MD5");
+                        log.debug("The file: {} 's MD5 checksum is {}",
+                                this.fileStatus.getPath().toString(),
+                                this.md5sum);
+                    } catch (Exception e) {
+                        log.error("Calculate the checksum of the original file: {} occurs an exception: {}.",
+                                this.fileStatus.getPath().toString(), e);
+                        this.md5sum = null;         // MD5校验和无效
+                        isUploadSuccess = false;
+                        break;
+                    } finally {
+                        if (null != fStream) {
+                            try {
+                                fStream.close();
+                                fStream = null;
+                            } catch (IOException e2) {
+                                log.warn("close file input stream failed. exception: " + e2.getMessage());
+                            }
+                        }
+                    }
+                }
+
+                fStream = this.fileSystem.open(this.fileStatus.getPath());      // 重新打开文件，正式开始上传
                 fStream.skip(0);
                 ObjectMetadata metadata = new ObjectMetadata();
                 long fileSize = this.fileSystem.getFileStatus(this.fileStatus.getPath()).getLen();
                 metadata.setContentLength(fileSize);
                 PutObjectRequest putObjectRequest = new PutObjectRequest(configReader.getBucket(), this.cosPath, fStream, metadata);
-                this.cosClient.putObject(putObjectRequest);
-                return;
+                PutObjectResult result = this.cosClient.putObject(putObjectRequest);
+                isUploadSuccess = true;
+                // 如果开启了强制校验MD5值，则会强制校验一遍MD5
+                if (configReader.isForceCheckMD5Sum()) {
+                    if (null != this.md5sum && this.md5sum.compareToIgnoreCase(result.getETag()) == 0) {
+                        isUploadSuccess = true;
+                        break;
+                    } else {
+                        // 由于开启了强制校验MD5Sum，因此，如果没有提供文件的原始MD5Sum，则也会认为是失败的
+                        isUploadSuccess = false;
+                        break;
+                    }
+                }
+                if (isUploadSuccess) {
+                    log.info("upload single file: {} successfully. cos_path:{} request_id: {}",
+                            this.fileStatus.getPath(), this.cosPath, result.getRequestId());
+                    break;
+                } else {
+                    log.error("upload single file:{} failed. retry count: {}, total retry num: {}, request_id: {}",
+                            this.fileStatus.getPath(), String.valueOf(i), kMaxRetryNum, result.getRequestId());
+                    continue;
+                }
             } catch (CosServiceException e) {
-                log.error("upload single file failure. retry_num:" + String.valueOf(i) + " msg:" + e.getMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
+                log.error("upload single file occurs an exception. "
+                        + "retry count:" + String.valueOf(i)
+                        + " msg:" + e.getMessage()
+                        + " ret code: "
+                        + e.getErrorCode()
+                        + " xml: " + e.getErrorResponseXml());
                 try {
                     Thread.sleep(this.kRetryInterval);
                 } catch (InterruptedException e1) {
-                    // 等待被中断
                     break;
                 }
-                continue;
+                continue;           // 继续重试
             } finally {
                 if (null != fStream) {
                     try {
@@ -148,10 +297,14 @@ public class FileToCosTask implements Runnable {
                 }
             }
         }
-        throw new Exception("upload single file failure. cos path: " + this.cosPath);
+
+        return isUploadSuccess;
     }
 
-    protected void uploadMultipartWithRetry() throws Exception {
+    protected boolean uploadMultipartWithRetry() throws Exception {
+        this.checkInternalMember();
+
+        boolean isUploadSuccess = false;
         String uploadId = this.buildUploadId();
         Map<Integer, PartSummary> existedParts = this.identifyExistingPartsForResume(uploadId);
 
@@ -165,7 +318,6 @@ public class FileToCosTask implements Runnable {
             }
         }
         // 然后开始上传
-        log.info("cos path: " + cosPath + ", fileSize: " + fileSize + ", partSize:" + partSize);
         List<Future<PartETag>> allUploadPartTasks = new ArrayList<Future<PartETag>>();
         int threadNum = this.configReader.getMaxUploadPartTaskNum();
         ExecutorService service = Executors.newFixedThreadPool(threadNum);
@@ -173,9 +325,12 @@ public class FileToCosTask implements Runnable {
         long pos = 0;
         for (int partNum = 1; pos < fileSize; partNum++) {
             partSize = Math.min(partSize, fileSize - pos);
-            log.info("part size : " + partSize);
             if (existedParts.containsKey(partNum)) {
-                log.info("part has already been uploaded, cos path: " + cosPath + " part num: " + partNum + " pos: " + pos + " part size: " + partSize);
+                log.info("part has already been uploaded, "
+                        + "cos path: " + cosPath
+                        + " part num: " + partNum
+                        + " pos: " + pos
+                        + " part size: " + partSize);
                 pos += partSize;
                 continue;
             }
@@ -190,10 +345,14 @@ public class FileToCosTask implements Runnable {
                 }
             }
 
-            UploadPartTask uploadPartTask = new UploadPartTask(this.fileSystem, this.fileStatus.getPath(), this.cosPath, uploadId, partNum, pos, partSize, this.cosClient, tmpSemaphore, this.configReader);
+            UploadPartTask uploadPartTask = new UploadPartTask(
+                    this.fileSystem,
+                    this.fileStatus.getPath(),
+                    this.cosPath,
+                    uploadId, partNum, pos, partSize, this.cosClient, tmpSemaphore, this.configReader);
             allUploadPartTasks.add(service.submit(uploadPartTask));
             pos += partSize;
-            log.info("pos : " + pos);
+            log.debug("pos : " + pos);
         }
 
         try {
@@ -201,10 +360,10 @@ public class FileToCosTask implements Runnable {
             service.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
             service.shutdownNow();
         } catch (Exception e) {
-            log.error("shutdown and wait part end occur a excpetion: " + e.toString());
-            return;
+            log.error("shutdown and wait part end occur an exception: " + e.toString());
         }
-        log.info("Upload all part success, cosPath: " + cosPath);
+
+        log.info("Upload all part successfully, localPath:{} cosPath: {}", this.fileStatus.getPath(), this.cosPath);
 
         // complete multipart upload
         List<PartETag> partETags = new ArrayList<PartETag>();
@@ -214,15 +373,27 @@ public class FileToCosTask implements Runnable {
         for (int i = 0; i < allUploadPartTasks.size(); i++) {
             partETags.add(allUploadPartTasks.get(i).get());
         }
-        CompleteMultipartUploadRequest completeMultipartUploadRequest = new CompleteMultipartUploadRequest(configReader.getBucket(), this.cosPath, uploadId, partETags);
+        CompleteMultipartUploadRequest completeMultipartUploadRequest
+                = new CompleteMultipartUploadRequest(configReader.getBucket(), this.cosPath, uploadId, partETags);
         for (int i = 0; i < this.kMaxRetryNum; i++) {
             try {
                 CompleteMultipartUploadResult result = this.cosClient.completeMultipartUpload(completeMultipartUploadRequest);
                 this.delScpFile(this.cosPath, uploadId);
-                log.info("complete multipart file success, cos path: " + cosPath + " file size: " + String.valueOf(fileSize) + " file path: " + this.fileStatus.getPath().toString() + " etag: " + result.getETag());
-                return;
+                isUploadSuccess = true;
+                log.info("complete multipart file successfully, "
+                        + "cos path: " + cosPath
+                        + " file size: " + String.valueOf(fileSize)
+                        + " file path: " + this.fileStatus.getPath().toString()
+                        + " etag: " + result.getETag()
+                        + " request id: " + result.getRequestId());
+                break;
             } catch (CosServiceException e) {
-                log.error("complete multi-part upload failure, retry num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret_code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
+                isUploadSuccess = false;
+                log.error("complete multi-part upload failed, "
+                        + "retry num: " + String.valueOf(i)
+                        + " msg: " + e.getErrorMessage()
+                        + " ret_code: " + e.getErrorCode()
+                        + " xml: " + e.getErrorResponseXml());
                 try {
                     Thread.sleep(this.kRetryInterval);
                 } catch (InterruptedException e1) {
@@ -231,26 +402,36 @@ public class FileToCosTask implements Runnable {
                 continue;
             }
         }
-        throw new Exception("upload file failure, cos path: " + this.cosPath + " file path: " + this.fileStatus.getPath().toString());
+
+        return isUploadSuccess;
     }
 
-    protected void createFolderWithRetry() throws Exception {
+    protected boolean createFolderWithRetry() throws Exception {
         this.checkInternalMember();
-
+        boolean isCreateSuccess = false;
         for (int i = 0; i < this.kMaxRetryNum; i++) {
             InputStream inputStream = null;
             try {
                 inputStream = new ByteArrayInputStream(new byte[0]);
                 ObjectMetadata metadata = new ObjectMetadata();
                 metadata.setContentLength(0);
-                if(!this.cosPath.endsWith("/")){
+                if (!this.cosPath.endsWith("/")) {
                     this.cosPath += "/";
                 }
-                PutObjectRequest putObjectRequest = new PutObjectRequest(configReader.getBucket(), this.cosPath, inputStream, metadata);
-                this.cosClient.putObject(putObjectRequest);
-                return;
+                PutObjectRequest putObjectRequest = new PutObjectRequest(
+                        configReader.getBucket(), this.cosPath, inputStream, metadata);
+                PutObjectResult result = this.cosClient.putObject(putObjectRequest);
+                isCreateSuccess = true;
+                log.info("create folder: {} successfully, cos path: {}, request id: {}",
+                        this.fileStatus.getPath().toString(), this.cosPath, result.getRequestId());
+                break;
             } catch (CosServiceException e) {
-                log.error("create folder failure, retry num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
+                isCreateSuccess = false;
+                log.error("create folder failed, "
+                        + "retry num: " + String.valueOf(i)
+                        + " msg: " + e.getErrorMessage()
+                        + " ret code: " + e.getErrorCode()
+                        + " xml: " + e.getErrorResponseXml());
                 try {
                     Thread.sleep(this.kRetryInterval);
                 } catch (InterruptedException e1) {
@@ -268,39 +449,51 @@ public class FileToCosTask implements Runnable {
             }
         }
 
-        throw new Exception("create folder failure, cos path: " + this.cosPath + " folder path: " + this.fileStatus.getPath().toString());
+        return isCreateSuccess;
     }
 
-    protected void CreateFolder() {
-        this.checkInternalMember();
-
-        try {
-            if (!this.isCosFolderExist()) {
-                this.createFolderWithRetry();
-                Statistics.instance.addCreateFolderOk();
-                String taskInfo = String.format("[create folder] [folder_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, "success");
-                log.info(taskInfo);
-                String printlnStr = String.format("[ok] [folder path: %s]", this.fileStatus.getPath().toString());
-                System.out.println(printlnStr);
-            } else {
-                log.info("folder already exist. cos path: " + this.cosPath);
-            }
-        } catch (Exception e) {
-            String taskInfo = String.format("[create folder] [folder_path: %s] [cos_path: %s] [ret: %s]", this.fileStatus.getPath().toString(), this.cosPath, e.getMessage());
-            log.error(taskInfo);
-            Statistics.instance.addCreateFolderFail();
-            String printlnStr = String.format("[failed] [folder_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
-            System.out.println(printlnStr);
-        }
-    }
-
-    private boolean isCosFolderExist() {
+    private boolean checkFolderExist() {
         try {
             this.cosClient.getObjectMetadata(this.configReader.getBucket(), this.cosPath);
         } catch (Exception e) {
             return false;
         }
         return true;
+    }
+
+    protected void CreateFolder() {
+        this.checkInternalMember();
+
+        boolean isCreateSuccess = false;
+
+        try {
+            if (!this.checkFolderExist()) {
+                isCreateSuccess = this.createFolderWithRetry();
+            } else {
+                log.info("folder already exist. cos path: " + this.cosPath);
+                isCreateSuccess = true;
+            }
+        } catch (Exception e) {
+            isCreateSuccess = false;
+        }
+
+
+        if (isCreateSuccess) {
+            Statistics.instance.addCreateFolderOk();
+            String taskInfo = String.format("[create folder successfully] [folder_path: %s] [cos_path: %s]",
+                    this.fileStatus.getPath().toString(), this.cosPath);
+            log.info(taskInfo);
+            String printlnStr = String.format("[success] [folder path: %s]", this.fileStatus.getPath().toString());
+            System.out.println(printlnStr);
+        } else {
+            Statistics.instance.addCreateFolderFail();
+            String taskInfo = String.format("[create folder failed] [folder_path: %s] [cos_path: %s]",
+                    this.fileStatus.getPath().toString(), this.cosPath);
+            log.error(taskInfo);
+            String printlnStr = String.format("[failure] [folder_path: %s] [cos_path: %s]",
+                    this.fileStatus.getPath().toString(), this.cosPath);
+            System.out.println(printlnStr);
+        }
     }
 
     private String getScpFilePath() {
@@ -380,7 +573,12 @@ public class FileToCosTask implements Runnable {
                 this.saveUploadId(initiateMultipartUploadResult.getUploadId());
                 break;
             } catch (CosServiceException e) {
-                log.error("init multipart upload failure. cos path: " + this.cosPath + " try num: " + String.valueOf(i) + " msg: " + e.getErrorMessage() + " ret code: " + e.getErrorCode() + " xml: " + e.getErrorResponseXml());
+                log.error("init multipart upload failed. "
+                        + "cos path: " + this.cosPath
+                        + " try num: " + String.valueOf(i)
+                        + " msg: " + e.getErrorMessage()
+                        + " ret code: " + e.getErrorCode()
+                        + " xml: " + e.getErrorResponseXml());
                 try {
                     Thread.sleep(this.kRetryInterval);
                 } catch (InterruptedException e1) {
@@ -391,7 +589,7 @@ public class FileToCosTask implements Runnable {
         }
 
         if (null == initiateMultipartUploadResult) {
-            throw new Exception("init upload multipart failure. cos path: " + this.cosPath);
+            throw new Exception("init upload multipart failed. cos path: " + this.cosPath);
         }
         log.info("Init multi-part upload success, cos path: " + this.cosPath + " upload id: " + initiateMultipartUploadResult.getUploadId());
         return initiateMultipartUploadResult.getUploadId();
@@ -425,7 +623,7 @@ public class FileToCosTask implements Runnable {
                 this.CreateFolder();
             }
         } catch (Exception e) {
-            log.error("upload file occurs an exception: ", e);
+            log.error("upload file or create directory occurs an exception: ", e);
             String printlnStr = String.format("[failed] [file_path: %s] [cos_path: %s]", this.fileStatus.getPath().toString(), this.cosPath);
             System.out.println(printlnStr);
             Statistics.instance.addUploadFileFail();

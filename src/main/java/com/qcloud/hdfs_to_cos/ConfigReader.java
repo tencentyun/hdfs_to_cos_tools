@@ -25,6 +25,7 @@ public class ConfigReader {
     private String srcHdfsPath = "";
     private String destCosPath = "";
     private boolean skipIfLengthMatch = false;
+    private boolean forceCheckMD5Sum = false;       // 是否开启强制校验MD5值,如果没有开启则只校验文件长度
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
     private int partSize = 0;
@@ -68,6 +69,11 @@ public class ConfigReader {
             if (cli.hasOption(OptionsArgsName.SKIP_IF_LENGTH_MATCH)) {
                 this.skipIfLengthMatch = true;
             }
+            
+            if (cli.hasOption(OptionsArgsName.FORCE_CHECK_MD5SUM)) {
+                this.forceCheckMD5Sum = true;
+            }
+
             if (cli.hasOption(OptionsArgsName.UPLOAD_PART_SIZE)) {
                 this.partSize = formatLongStr(
                         OptionsArgsName.UPLOAD_PART_SIZE,
@@ -247,5 +253,7 @@ public class ConfigReader {
         return skipIfLengthMatch;
     }
 
-
+    public boolean isForceCheckMD5Sum() {
+        return this.forceCheckMD5Sum;
+    }
 }

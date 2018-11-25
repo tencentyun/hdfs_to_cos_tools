@@ -57,7 +57,7 @@ public class UploadPartTask implements Callable<PartETag> {
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
                                 .withInputStream(fStream).withPartSize(partSize);
                 PartETag etag = cosClient.uploadPart(uploadRequest).getPartETag();
-                log.info("upload part success, etag: " + etag.getETag() + ", part_number: "
+                log.info("upload part successfully, etag: " + etag.getETag() + ", part_number: "
                         + etag.getPartNumber() + ", bucket: " + configReader.getBucket() + ", key:"
                         + key);
                 return etag;
@@ -68,12 +68,12 @@ public class UploadPartTask implements Callable<PartETag> {
                     try {
                         fStream.close();
                     } catch (IOException e) {
-                        log.warn("close hdfs file inputstream failed");
+                        log.warn("close hdfs file input stream failed");
                     }
                 }
             }
         }
-        throw new Exception("upload part failure, msg: " + this.toString());
+        throw new Exception("upload part failed, msg: " + this.toString());
     }
 
     public String toString() {

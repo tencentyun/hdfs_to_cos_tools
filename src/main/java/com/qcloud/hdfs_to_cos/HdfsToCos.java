@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.qcloud.cos.COSClient;
-import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;
 import com.qcloud.cos.model.GetObjectMetadataRequest;
 
@@ -75,8 +74,8 @@ public class HdfsToCos {
             this.submitTask(this.buildHdfsFileToCosTask(targetPathStatus));
             return;
         }
-        FileStatus[] memberArry = hdfsFS.listStatus(hdfsPath);
-        for (FileStatus member : memberArry) {
+        FileStatus[] memberArray = hdfsFS.listStatus(hdfsPath);
+        for (FileStatus member : memberArray) {
             if (CommonHarUtils.isHarFile(member)) {
                 HarFileSystem harFS = new HarFileSystem(configReader.getHdfsFS());
                 harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()), hdfsFS.getConf());
@@ -97,9 +96,13 @@ public class HdfsToCos {
         }
         FileToCosTask task = null;
         try {
-            task = new FileToCosTask(this.configReader, this.cosClient, fileStatus, this.configReader.getHdfsFS(), CommonHdfsUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+            task = new FileToCosTask(
+                    this.configReader,
+                    this.cosClient, fileStatus,
+                    this.configReader.getHdfsFS(),
+                    CommonHdfsUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
         } catch (IOException e) {
-            log.error("build a hdfsFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            log.error("build a hdfsFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
             return null;
         }
         return task;
@@ -115,12 +118,17 @@ public class HdfsToCos {
         try {
             HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
             harFileSystem.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), configReader.getHdfsFS().getConf());
-            task = new FileToCosTask(this.configReader, this.cosClient, fileStatus, harFileSystem, CommonHarUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+            task = new FileToCosTask(
+                    this.configReader,
+                    this.cosClient,
+                    fileStatus,
+                    harFileSystem,
+                    CommonHarUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
         } catch (IOException e) {
-            log.error("build harFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            log.error("build harFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
             return null;
         } catch (URISyntaxException e) {
-            log.error("build harFileToCosTask for " + fileStatus.toString() + " failure. exception: " + e.getMessage());
+            log.error("build harFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
             return null;
         }
 
@@ -140,7 +148,6 @@ public class HdfsToCos {
                             + "Please check if the appid, bucket or endpoint configuration in the configuration is correct.");
                     return false;
                 }
-                log.debug("checkCosClient success!");
                 return true;
             } catch (CosServiceException e) {
                 if (e.getStatusCode() == 403) {

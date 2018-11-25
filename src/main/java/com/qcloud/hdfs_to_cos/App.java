@@ -16,9 +16,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
 
-/**
- * Hello world!
- */
 public class App {
     static final Logger LOG = LoggerFactory.getLogger(App.class);
 
@@ -49,9 +46,7 @@ public class App {
         CommandLineParser parser = new DefaultParser();
         CommandLine cli = null;
         try {
-
             cli = parser.parse(OptionsArgsName.getAllSupportOption(), args);
-
             if (cli.hasOption(OptionsArgsName.HELP)) {
                 OptionsArgsName.printHelpOption();
                 return;
@@ -87,7 +82,7 @@ public class App {
         App.executorPool.shutdown();                // 停止提交新的任务
         HdfsToCos hdfsToCos = new HdfsToCos(configReader, App.taskBlockingQueue, App.cosClient);
         hdfsToCos.run();
-        while(App.taskBlockingQueue.size() != 0){
+        while (App.taskBlockingQueue.size() != 0) {
             try {
                 Thread.sleep(1 * 1000);
             } catch (InterruptedException e) {
