@@ -37,6 +37,8 @@ public class OptionsArgsName {
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
         options.addOption(getForceCheckMD5Sum());
+        options.addOption(getMaxTaskNumOption());
+        options.addOption(getMaxMultiPartUploadTaskNumOption());
         return options;
     }
 
