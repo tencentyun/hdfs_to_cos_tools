@@ -29,8 +29,7 @@ public class ConfigReader {
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
     private int partSize = 0;
-    private static final int DEFAULT_PART_SIZE = 2 * 1024 * 1024;
-
+    private static final int DEFAULT_PART_SIZE = 8 * 1024 * 1024;       // 默认的块大小为8MB
     private CommandLine cli = null;
     private Properties userInfoProp = null;
     private FileSystem hdfsFS = null;
@@ -69,7 +68,7 @@ public class ConfigReader {
             if (cli.hasOption(OptionsArgsName.SKIP_IF_LENGTH_MATCH)) {
                 this.skipIfLengthMatch = true;
             }
-            
+
             if (cli.hasOption(OptionsArgsName.FORCE_CHECK_MD5SUM)) {
                 this.forceCheckMD5Sum = true;
             }

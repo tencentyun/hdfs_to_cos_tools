@@ -39,6 +39,7 @@ public class OptionsArgsName {
         options.addOption(getForceCheckMD5Sum());
         options.addOption(getMaxTaskNumOption());
         options.addOption(getMaxMultiPartUploadTaskNumOption());
+        options.addOption(getPartSize());
         return options;
     }
 
