@@ -4,16 +4,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class Utils {
     /**
      * 计算输入流的校验和，支持MD5和SHA
      *
-     * @param inputStream   待计算输入流
-     * @param algorithm 要计算校验和的算法，支持MD5和SHA算法
-     * @return  校验和的十六进制字符串
+     * @param inputStream 待计算输入流
+     * @param algorithm   要计算校验和的算法，支持MD5和SHA算法
+     * @return 校验和的十六进制字符串
      */
-    public static String calInputStreamCheckSum(InputStream inputStream, String algorithm) throws NoSuchAlgorithmException, IOException {
+    public static String calInputStreamCheckSum(InputStream inputStream,
+            String algorithm) throws NoSuchAlgorithmException, IOException {
         MessageDigest digest = MessageDigest.getInstance(algorithm);
         byte[] databytes = new byte[1024];
         int nRead = 0;
@@ -28,5 +30,13 @@ public final class Utils {
         }
 
         return md5.toString();
+    }
+
+
+    public static void sleep(int retryIndex, long defaultInterval) throws InterruptedException {
+//        long sleepLeast = retryIndex * 300L;
+//        long sleepBound = retryIndex * 500L;
+//        long interval = ThreadLocalRandom.current().nextLong(sleepLeast, sleepBound);
+        Thread.sleep(defaultInterval);
     }
 }

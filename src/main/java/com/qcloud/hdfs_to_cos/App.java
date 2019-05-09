@@ -30,7 +30,9 @@ public class App {
             return null;
         }
         ClientConfig clientConfig = new ClientConfig(new Region(configReader.getRegion()));
-        clientConfig.setEndPointSuffix(configReader.getEndpointSuffix());
+        if(null != configReader.getEndpointSuffix()){
+            clientConfig.setEndPointSuffix(configReader.getEndpointSuffix());
+        }
         COSCredentials cred = null;
         if (configReader.getAppid() == 0) {
             cred = new BasicCOSCredentials(configReader.getSecretId(), configReader.getSecretKey());

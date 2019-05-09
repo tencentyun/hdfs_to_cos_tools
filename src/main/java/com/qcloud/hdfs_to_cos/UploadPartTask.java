@@ -17,11 +17,15 @@ import com.qcloud.cos.model.UploadPartRequest;
 
 
 public class UploadPartTask implements Callable<PartETag> {
-    private static final Logger log = LoggerFactory.getLogger(UploadPartTask.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(UploadPartTask.class);
+    private int kMaxRetryNum = 3;
+    private long retryInterval = 500;
 
-
-    public UploadPartTask(FileSystem fileSystem, Path filePath, String key, String uploadId, int partNumber, long pos,
-                          long partSize, COSClient cosClient, Semaphore semaphore, ConfigReader configReader) {
+    public UploadPartTask(FileSystem fileSystem, Path filePath, String key,
+            String uploadId, int partNumber, long pos,
+            long partSize, COSClient cosClient, Semaphore semaphore,
+            ConfigReader configReader) {
         super();
         this.fileSystem = fileSystem;
         this.filePath = filePath;
@@ -33,6 +37,8 @@ public class UploadPartTask implements Callable<PartETag> {
         this.cosClient = cosClient;
         this.semaphore = semaphore;
         this.configReader = configReader;
+        this.kMaxRetryNum = configReader.getMaxRetryNum();
+        this.retryInterval = configReader.getRetryInterval();
     }
 
     public PartETag call() throws Exception {
@@ -46,7 +52,6 @@ public class UploadPartTask implements Callable<PartETag> {
     }
 
     private PartETag uploadPartWithRetry() throws Exception {
-        final int kMaxRetryNum = 3;
         for (int i = 0; i < kMaxRetryNum; ++i) {
             FSDataInputStream fStream = null;
             try {
@@ -56,13 +61,24 @@ public class UploadPartTask implements Callable<PartETag> {
                         new UploadPartRequest().withBucketName(configReader.getBucket())
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
                                 .withInputStream(fStream).withPartSize(partSize);
-                PartETag etag = cosClient.uploadPart(uploadRequest).getPartETag();
+                PartETag etag =
+                        cosClient.uploadPart(uploadRequest).getPartETag();
                 log.info("upload part successfully, etag: " + etag.getETag() + ", part_number: "
                         + etag.getPartNumber() + ", bucket: " + configReader.getBucket() + ", key:"
                         + key);
                 return etag;
             } catch (CosServiceException e) {
-                continue;
+                log.error("upload part occurs an exception. "
+                        + "retry count:" + String.valueOf(i)
+                        + " msg:" + e.getMessage()
+                        + " ret code: "
+                        + e.getErrorCode()
+                        + " xml: " + e.getErrorResponseXml());
+                try {
+                    Utils.sleep(i, this.retryInterval);
+                } catch (InterruptedException e1) {
+                    break;
+                }
             } finally {
                 if (fStream != null) {
                     try {
@@ -76,10 +92,16 @@ public class UploadPartTask implements Callable<PartETag> {
         throw new Exception("upload part failed, msg: " + this.toString());
     }
 
+    public void setkMaxRetryNum(int kMaxRetryNum) {
+        this.kMaxRetryNum = kMaxRetryNum;
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("bucketName:").append(configReader.getBucket()).append(", keyName:").append(key)
-                .append(", uploadId:").append(uploadId).append(", partNumber:").append(partNumber);
+        sb.append("bucketName:").append(configReader.getBucket()).append(", "
+                + "keyName:").append(key)
+                .append(", uploadId:").append(uploadId).append(", partNumber"
+                + ":").append(partNumber);
         return sb.toString();
     }
 

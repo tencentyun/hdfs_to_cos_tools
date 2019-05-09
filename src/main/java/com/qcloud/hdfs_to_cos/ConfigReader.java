@@ -25,15 +25,23 @@ public class ConfigReader {
     private String srcHdfsPath = "";
     private String destCosPath = "";
     private boolean skipIfLengthMatch = false;
-    private boolean forceCheckMD5Sum = false;       // 是否开启强制校验MD5值,如果没有开启则只校验文件长度
+    private boolean forceCheckMD5Sum = false;       // 是否开启强制校验MD5值,
+    // 如果没有开启则只校验文件长度
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
     private int partSize = 0;
-    private static final int DEFAULT_PART_SIZE = 8 * 1024 * 1024;       // 默认的块大小为8MB
+    private static final int DEFAULT_PART_SIZE = 8 * 1024 * 1024;       //
+    // 默认的块大小为8MB
     private CommandLine cli = null;
     private Properties userInfoProp = null;
     private FileSystem hdfsFS = null;
     private HarFileSystem harFs = null;
+
+    private int maxRetryNum = DEFAULT_MAX_RETRY_NUM;
+    private static final int DEFAULT_MAX_RETRY_NUM = 5;
+
+    private long retryInterval = DEFAULT_MAX_RETRY_INTERVAL;
+    private static final long DEFAULT_MAX_RETRY_INTERVAL = 500;
 
     public ConfigReader(CommandLine cli) {
         this.cli = cli;
@@ -52,19 +60,26 @@ public class ConfigReader {
         try {
             this.appid = formatLongStr(OptionsArgsName.APPID,
                     getRequiredStringParam(OptionsArgsName.APPID, "0")).longValue();
-            this.secretId = getRequiredStringParam(OptionsArgsName.SECRET_ID, null);
-            this.secretKey = getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
+            this.secretId = getRequiredStringParam(OptionsArgsName.SECRET_ID,
+                    null);
+            this.secretKey =
+                    getRequiredStringParam(OptionsArgsName.SECRET_KEY, null);
             this.bucket = getRequiredStringParam(OptionsArgsName.BUCKET, null);
-            this.endpointSuffix = getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX, null);
+            this.endpointSuffix =
+                    getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX,
+                            null);
             if (null == this.endpointSuffix) {
                 this.region = getRequiredStringParam(OptionsArgsName.REGION, "");
             }
-            this.srcHdfsPath = getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
-            this.destCosPath = getRequiredStringParam(OptionsArgsName.COS_PATH, null);
+            this.srcHdfsPath =
+                    getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
+            this.destCosPath =
+                    getRequiredStringParam(OptionsArgsName.COS_PATH, null);
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
-            this.maxMultiPartUploadTaskNum = formatLongStr(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM,
-                    getRequiredStringParam(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM, "4")).intValue();
+            this.maxMultiPartUploadTaskNum =
+                    formatLongStr(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM,
+                            getRequiredStringParam(OptionsArgsName.MAX_MULTIPART_UPLOAD_TASK_NUM, "4")).intValue();
             if (cli.hasOption(OptionsArgsName.SKIP_IF_LENGTH_MATCH)) {
                 this.skipIfLengthMatch = true;
             }
@@ -78,6 +93,19 @@ public class ConfigReader {
                         OptionsArgsName.UPLOAD_PART_SIZE,
                         getRequiredStringParam(OptionsArgsName.UPLOAD_PART_SIZE, String.valueOf(this.DEFAULT_PART_SIZE))).intValue();
             }
+
+            if (cli.hasOption(OptionsArgsName.MAX_RETRY_NUM)) {
+                this.maxRetryNum = formatLongStr(OptionsArgsName.MAX_RETRY_NUM,
+                        getRequiredStringParam(OptionsArgsName.MAX_RETRY_NUM,
+                                String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_NUM))).intValue();
+            }
+
+            if(cli.hasOption(OptionsArgsName.RETRY_INTERVAL)){
+              this.retryInterval = formatLongStr(OptionsArgsName.RETRY_INTERVAL,
+                      getRequiredStringParam(OptionsArgsName.RETRY_INTERVAL,
+                          String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_INTERVAL))).intValue();
+            }
+
         } catch (IllegalArgumentException e) {
             this.initConfigFlag = false;
             this.initErrMsg = String.format(e.getMessage());
@@ -95,13 +123,15 @@ public class ConfigReader {
         if (!hdfsConfFile.isFile() || !hdfsConfFile.canRead()) {
             this.initConfigFlag = false;
             this.initErrMsg = String.format(
-                    "config error, hdfs_conf_file \"%s\" doesn't exist or can't be read!",
+                    "config error, hdfs_conf_file \"%s\" doesn't exist or "
+                            + "can't be read!",
                     hdfsConfPath);
             return false;
         }
 
         Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+        conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs"
+                + ".DistributedFileSystem");
         conf.set("fs.hdfs.impl.disable.cache", "true");
         conf.addResource(new Path(hdfsConfPath));
 
@@ -125,7 +155,8 @@ public class ConfigReader {
         if (!confFile.isFile() || !confFile.canRead()) {
             this.initConfigFlag = false;
             this.initErrMsg = String.format(
-                    "config error, cos_info_file \"%s\" doesn't exist or can't be read!",
+                    "config error, cos_info_file \"%s\" doesn't exist or "
+                            + "can't be read!",
                     cosConfPath);
             return false;
         }
@@ -139,7 +170,8 @@ public class ConfigReader {
             userInfoProp.load(in);
         } catch (IOException e) {
             this.initConfigFlag = false;
-            this.initErrMsg = String.format("config error: read file %s occur a exception: %s",
+            this.initErrMsg = String.format("config error: read file %s occur"
+                            + " a exception: %s",
                     cosConfPath, e.getMessage());
             return false;
         } finally {
@@ -149,7 +181,8 @@ public class ConfigReader {
                 } catch (IOException e) {
                     this.initConfigFlag = false;
                     this.initErrMsg =
-                            String.format("config error: close file %s occur a exception: %s",
+                            String.format("config error: close file %s occur "
+                                            + "a exception: %s",
                                     cosConfPath, e.getMessage());
                     return false;
                 }
@@ -183,7 +216,8 @@ public class ConfigReader {
             long longValue = Long.valueOf(valueStr);
             return longValue;
         } catch (NumberFormatException e) {
-            String errMsg = String.format("config error: %s value is illeagl num!", key);
+            String errMsg = String.format("config error: %s value is illeagl "
+                    + "num!", key);
             throw new IllegalArgumentException(errMsg);
         }
     }
@@ -254,5 +288,13 @@ public class ConfigReader {
 
     public boolean isForceCheckMD5Sum() {
         return this.forceCheckMD5Sum;
+    }
+
+    public int getMaxRetryNum() {
+        return maxRetryNum;
+    }
+
+    public long getRetryInterval(){
+      return retryInterval;
     }
 }
