@@ -20,13 +20,15 @@ public class HdfsToCos {
 
     private static final Logger log = LoggerFactory.getLogger(HdfsToCos.class);
 
-    private ConfigReader configReader = null;
-    private BlockingQueue<FileToCosTask> taskBlockingQueue = null;
-    private COSClient cosClient = null;
+    private ConfigReader configReader;
+    private BlockingQueue<FileToCosTask> taskBlockingQueue;
+    private COSClient cosClient;
 
     private String configCheckMsg;
 
-    public HdfsToCos(ConfigReader configReader, BlockingQueue<FileToCosTask> taskBlockingQueue, COSClient cosClient) {
+    public HdfsToCos(ConfigReader configReader,
+            BlockingQueue<FileToCosTask> taskBlockingQueue,
+            COSClient cosClient) {
         this.configReader = configReader;
         this.taskBlockingQueue = taskBlockingQueue;
         this.cosClient = cosClient;
@@ -38,7 +40,8 @@ public class HdfsToCos {
         }
 
         if (null == this.taskBlockingQueue) {
-            throw new NullPointerException("can not submit a task to null blocking queue.");
+            throw new NullPointerException("can not submit a task to null "
+                    + "blocking queue.");
         }
         this.taskBlockingQueue.put(task);
     }
@@ -53,7 +56,7 @@ public class HdfsToCos {
 
         FileStatus[] pathStatus = harFs.listStatus(filePath);
         for (FileStatus fileStatus : pathStatus) {
-            if (CommonHarUtils.isHarFile(fileStatus)) {
+            if (CommonHarUtils.isHarFile(fileStatus, harFs)) {
                 harFs.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), harFs.getConf());
                 scanHarMember(fileStatus.getPath(), harFs);
             }
@@ -76,9 +79,12 @@ public class HdfsToCos {
         }
         FileStatus[] memberArray = hdfsFS.listStatus(hdfsPath);
         for (FileStatus member : memberArray) {
-            if (CommonHarUtils.isHarFile(member)) {
-                HarFileSystem harFS = new HarFileSystem(configReader.getHdfsFS());
-                harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()), hdfsFS.getConf());
+            if (CommonHarUtils.isHarFile(member, hdfsFS)
+                    && configReader.isDecompressHarFile()) {
+                HarFileSystem harFS =
+                        new HarFileSystem(configReader.getHdfsFS());
+                harFS.initialize(CommonHarUtils.buildFsUri(member.getPath()),
+                        hdfsFS.getConf());
                 scanHarMember(member.getPath(), harFS);
             } else {
                 this.submitTask(this.buildHdfsFileToCosTask(member));
@@ -100,9 +106,11 @@ public class HdfsToCos {
                     this.configReader,
                     this.cosClient, fileStatus,
                     this.configReader.getHdfsFS(),
-                    CommonHdfsUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+                    CommonHdfsUtils.convertToCosPath(configReader,
+                            fileStatus.getPath()).toString());
         } catch (IOException e) {
-            log.error("build a hdfsFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
+            log.error("build a hdfsFileToCosTask for " + fileStatus.toString()
+                    + " failed. exception: " + e.getMessage());
             return null;
         }
         return task;
@@ -114,21 +122,26 @@ public class HdfsToCos {
             return null;
         }
 
-        FileToCosTask task = null;
+        FileToCosTask task;
         try {
-            HarFileSystem harFileSystem = new HarFileSystem(configReader.getHdfsFS());
-            harFileSystem.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()), configReader.getHdfsFS().getConf());
+            HarFileSystem harFileSystem =
+                    new HarFileSystem(configReader.getHdfsFS());
+            harFileSystem.initialize(CommonHarUtils.buildFsUri(fileStatus.getPath()),
+                    configReader.getHdfsFS().getConf());
             task = new FileToCosTask(
                     this.configReader,
                     this.cosClient,
                     fileStatus,
                     harFileSystem,
-                    CommonHarUtils.convertToCosPath(configReader, fileStatus.getPath()).toString());
+                    CommonHarUtils.convertToCosPath(configReader,
+                            fileStatus.getPath()).toString());
         } catch (IOException e) {
-            log.error("build harFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
+            log.error("build harFileToCosTask for " + fileStatus.toString()
+                    + " failed.", e);
             return null;
         } catch (URISyntaxException e) {
-            log.error("build harFileToCosTask for " + fileStatus.toString() + " failed. exception: " + e.getMessage());
+            log.error("build harFileToCosTask for " + fileStatus.toString()
+                    + " failed.", e);
             return null;
         }
 
@@ -137,23 +150,30 @@ public class HdfsToCos {
 
     private boolean checkCosClientLegal() {
         GetObjectMetadataRequest statRequest =
-                new GetObjectMetadataRequest(this.configReader.getBucket(), "/");
+                new GetObjectMetadataRequest(this.configReader.getBucket(),
+                        "/");
 
         // 首先检查Bucket是否存在
         for (int i = 0; i < 2; i++) {
             try {
-                boolean isBucketExist = this.cosClient.doesBucketExist(this.configReader.getBucket());
+                boolean isBucketExist =
+                        this.cosClient.doesBucketExist(this.configReader.getBucket());
                 if (!isBucketExist) {
-                    this.configCheckMsg = new String("The specified bucket in the configuration does not exist.\n"
-                            + "Please check if the appid, bucket or endpoint configuration in the configuration is correct.");
+                    this.configCheckMsg = new String("The specified bucket in"
+                            + " the configuration does not exist.\n"
+                            + "Please check if the appid, bucket or endpoint "
+                            + "configuration in the configuration is "
+                            + "correct.");
                     return false;
                 }
                 return true;
             } catch (CosServiceException e) {
                 if (e.getStatusCode() == 403) {
                     // 鉴权不过，检查secret id和secret key
-                    this.configCheckMsg = new String("The provided SecretID or Secret key are invalid.\n"
-                            + "Please check if ak and sk are configured correctly.");
+                    this.configCheckMsg = new String("The provided SecretID "
+                            + "or Secret key are invalid.\n"
+                            + "Please check if ak and sk are configured "
+                            + "correctly.");
                     break;
                 }
                 continue;
@@ -167,7 +187,8 @@ public class HdfsToCos {
     public void run() {
         if (!checkCosClientLegal()) {
             StringBuilder errMsgBuilder =
-                    new StringBuilder("Configuration information verification error:\n");
+                    new StringBuilder("Configuration information verification"
+                            + " error:\n");
             errMsgBuilder.append(this.configCheckMsg);
             System.err.println(errMsgBuilder.toString());
             cosClient.shutdown();
@@ -176,8 +197,10 @@ public class HdfsToCos {
 
         try {
             if (configReader.getSrcHdfsPath().startsWith("har://")) {
-                HarFileSystem harFs = new HarFileSystem(configReader.getHdfsFS());
-                harFs.initialize(CommonHarUtils.buildFsUri(new Path(configReader.getSrcHdfsPath())), configReader.getHdfsFS().getConf());
+                HarFileSystem harFs =
+                        new HarFileSystem(configReader.getHdfsFS());
+                harFs.initialize(CommonHarUtils.buildFsUri(new Path(configReader.getSrcHdfsPath())),
+                        configReader.getHdfsFS().getConf());
                 String srcPath = configReader.getSrcHdfsPath();
                 this.scanHarMember(new Path(srcPath), harFs);
             } else {

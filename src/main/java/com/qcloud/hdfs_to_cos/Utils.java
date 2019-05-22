@@ -36,7 +36,21 @@ public final class Utils {
     public static void sleep(int retryIndex, long defaultInterval) throws InterruptedException {
 //        long sleepLeast = retryIndex * 300L;
 //        long sleepBound = retryIndex * 500L;
-//        long interval = ThreadLocalRandom.current().nextLong(sleepLeast, sleepBound);
+//        long interval = ThreadLocalRandom.current().nextLong(sleepLeast,
+//        sleepBound);
         Thread.sleep(defaultInterval);
+    }
+
+    /**
+     * 合并路径头部的双斜线
+     * @param filePath 待合并的文件路径
+     * @return  合并以后结果
+     */
+    public static String trimDoubleSlash(String filePath) {
+        if (filePath.startsWith("//")) {
+            filePath = filePath.replaceFirst("//", "/");
+        }
+
+        return filePath;
     }
 }

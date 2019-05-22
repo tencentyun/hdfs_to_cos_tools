@@ -8,7 +8,6 @@ import java.util.Properties;
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class ConfigReader {
@@ -16,26 +15,26 @@ public class ConfigReader {
     private boolean initConfigFlag = true;
     private String initErrMsg = "";
 
-    private long appid = 0;
-    private String secretId = "";
-    private String secretKey = "";
-    private String bucket = "";
-    private String region = "";
-    private String endpointSuffix = "";
-    private String srcHdfsPath = "";
-    private String destCosPath = "";
+    private String appid;
+    private String secretId;
+    private String secretKey;
+    private String bucket;
+    private String region;
+    private String endpointSuffix;
+    private String srcHdfsPath;
+    private String destCosPath;
     private boolean skipIfLengthMatch = false;
-    private boolean forceCheckMD5Sum = false;       // 是否开启强制校验MD5值,
-    // 如果没有开启则只校验文件长度
+    // 是否开启强制校验MD5值,如果没有开启则只校验文件长度
+    private boolean forceCheckMD5Sum = false;
+    private boolean decompressHarFile = false;  // 是否自动解压har文件
     private int maxTaskNum = 4;
     private int maxMultiPartUploadTaskNum = 4;
     private int partSize = 0;
     private static final int DEFAULT_PART_SIZE = 8 * 1024 * 1024;       //
     // 默认的块大小为8MB
-    private CommandLine cli = null;
+    private CommandLine cli;
     private Properties userInfoProp = null;
     private FileSystem hdfsFS = null;
-    private HarFileSystem harFs = null;
 
     private int maxRetryNum = DEFAULT_MAX_RETRY_NUM;
     private static final int DEFAULT_MAX_RETRY_NUM = 5;
@@ -58,8 +57,7 @@ public class ConfigReader {
         }
 
         try {
-            this.appid = formatLongStr(OptionsArgsName.APPID,
-                    getRequiredStringParam(OptionsArgsName.APPID, "0")).longValue();
+            this.appid = getRequiredStringParam(OptionsArgsName.APPID, null);
             this.secretId = getRequiredStringParam(OptionsArgsName.SECRET_ID,
                     null);
             this.secretKey =
@@ -69,7 +67,8 @@ public class ConfigReader {
                     getRequiredStringParam(OptionsArgsName.ENDPOINT_SUFFIX,
                             null);
             if (null == this.endpointSuffix) {
-                this.region = getRequiredStringParam(OptionsArgsName.REGION, "");
+                this.region = getRequiredStringParam(OptionsArgsName.REGION,
+                        "");
             }
             this.srcHdfsPath =
                     getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
@@ -88,6 +87,10 @@ public class ConfigReader {
                 this.forceCheckMD5Sum = true;
             }
 
+            if (cli.hasOption(OptionsArgsName.DECOMPRESS_HAR)) {
+                this.decompressHarFile = true;
+            }
+
             if (cli.hasOption(OptionsArgsName.UPLOAD_PART_SIZE)) {
                 this.partSize = formatLongStr(
                         OptionsArgsName.UPLOAD_PART_SIZE,
@@ -100,10 +103,11 @@ public class ConfigReader {
                                 String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_NUM))).intValue();
             }
 
-            if(cli.hasOption(OptionsArgsName.RETRY_INTERVAL)){
-              this.retryInterval = formatLongStr(OptionsArgsName.RETRY_INTERVAL,
-                      getRequiredStringParam(OptionsArgsName.RETRY_INTERVAL,
-                          String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_INTERVAL))).intValue();
+            if (cli.hasOption(OptionsArgsName.RETRY_INTERVAL)) {
+                this.retryInterval =
+                        formatLongStr(OptionsArgsName.RETRY_INTERVAL,
+                                getRequiredStringParam(OptionsArgsName.RETRY_INTERVAL,
+                                        String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_INTERVAL))).intValue();
             }
 
         } catch (IllegalArgumentException e) {
@@ -230,7 +234,7 @@ public class ConfigReader {
         return initErrMsg;
     }
 
-    public long getAppid() {
+    public String getAppid() {
         return appid;
     }
 
@@ -290,11 +294,15 @@ public class ConfigReader {
         return this.forceCheckMD5Sum;
     }
 
+    public boolean isDecompressHarFile() {
+        return decompressHarFile;
+    }
+
     public int getMaxRetryNum() {
         return maxRetryNum;
     }
 
-    public long getRetryInterval(){
-      return retryInterval;
+    public long getRetryInterval() {
+        return retryInterval;
     }
 }

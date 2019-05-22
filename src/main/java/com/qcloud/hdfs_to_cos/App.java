@@ -23,21 +23,25 @@ public class App {
     public static BlockingQueue<FileToCosTask> taskBlockingQueue = null;
     public static ExecutorService executorPool = null;
 
-    public static List<HdfsToCosExecutor> executors = new LinkedList<HdfsToCosExecutor>();
+    public static List<HdfsToCosExecutor> executors =
+            new LinkedList<HdfsToCosExecutor>();
 
     public static COSClient buildCosClient(ConfigReader configReader) {
         if (null == configReader) {
             return null;
         }
-        ClientConfig clientConfig = new ClientConfig(new Region(configReader.getRegion()));
-        if(null != configReader.getEndpointSuffix()){
+        ClientConfig clientConfig =
+                new ClientConfig(new Region(configReader.getRegion()));
+        if (null != configReader.getEndpointSuffix()) {
             clientConfig.setEndPointSuffix(configReader.getEndpointSuffix());
         }
-        COSCredentials cred = null;
-        if (configReader.getAppid() == 0) {
-            cred = new BasicCOSCredentials(configReader.getSecretId(), configReader.getSecretKey());
+        COSCredentials cred;
+        if (null == configReader.getAppid()
+                || configReader.getAppid().isEmpty()) {
+            cred = new BasicCOSCredentials(configReader.getSecretId(),
+                    configReader.getSecretKey());
         } else {
-            cred = new BasicCOSCredentials(String.valueOf(configReader.getAppid()),
+            cred = new BasicCOSCredentials(configReader.getAppid(),
                     configReader.getSecretId(), configReader.getSecretKey());
         }
 
@@ -46,7 +50,7 @@ public class App {
 
     public static void main(String[] args) {
         CommandLineParser parser = new DefaultParser();
-        CommandLine cli = null;
+        CommandLine cli;
         try {
             cli = parser.parse(OptionsArgsName.getAllSupportOption(), args);
             if (cli.hasOption(OptionsArgsName.HELP)) {
@@ -68,27 +72,32 @@ public class App {
             App.cosClient = App.buildCosClient(configReader);
         }
         if (null == App.executorPool) {
-            App.executorPool = Executors.newFixedThreadPool(configReader.getMaxTaskNum());                                              // 任务并发线程池
+            App.executorPool =
+                    Executors.newFixedThreadPool(configReader.getMaxTaskNum());                         // 任务并发线程池
         }
         if (null == App.taskBlockingQueue) {
-            App.taskBlockingQueue = new LinkedBlockingQueue<FileToCosTask>(configReader.getMaxTaskNum() * 5);           // 暂定为任务队列为并发数的5倍
+            App.taskBlockingQueue =
+                    new LinkedBlockingQueue<FileToCosTask>(configReader.getMaxTaskNum() * 2);           // 暂定为任务队列为并发数的2倍
         }
 
         Statistics.instance.start();
         // 启动消费者
         for (int i = 0; i < configReader.getMaxTaskNum(); i++) {
-            HdfsToCosExecutor executor = new HdfsToCosExecutor(App.taskBlockingQueue, true);
+            HdfsToCosExecutor executor =
+                    new HdfsToCosExecutor(App.taskBlockingQueue, true);
             App.executorPool.submit(executor);
             App.executors.add(executor);
         }
         App.executorPool.shutdown();                // 停止提交新的任务
-        HdfsToCos hdfsToCos = new HdfsToCos(configReader, App.taskBlockingQueue, App.cosClient);
+        HdfsToCos hdfsToCos = new HdfsToCos(configReader,
+                App.taskBlockingQueue, App.cosClient);
         hdfsToCos.run();
         while (App.taskBlockingQueue.size() != 0) {
             try {
                 Thread.sleep(1 * 1000);
             } catch (InterruptedException e) {
-                LOG.error("An exception occurred during the polling interval", e);
+                LOG.error("An exception occurred during the polling interval"
+                        , e);
             }
         }
         for (HdfsToCosExecutor executor : App.executors) {
@@ -97,7 +106,8 @@ public class App {
         try {
             App.executorPool.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            LOG.error("An exception occurred while waiting for the thread pool to complete", e);
+            LOG.error("An exception occurred while waiting for the thread "
+                    + "pool to complete", e);
         }
         Statistics.instance.printStatics();
     }

@@ -31,6 +31,8 @@ public class OptionsArgsName {
             "skip_if_len_match";      // 是否本地和COS上的文件名相同且长度一致，就跳过
     public static final String FORCE_CHECK_MD5SUM =
             "force_check_md5sum";       // 上传文件检查时，是否强制检查md5sum
+    public static final String DECOMPRESS_HAR =
+            "decompress_har";           // 迁移过程中，是否解压har文件
     public static final String MAX_TASK_NUM =
             "max_task_num";                   // 并发线程数
     public static final String MAX_MULTIPART_UPLOAD_TASK_NUM =
@@ -54,6 +56,7 @@ public class OptionsArgsName {
         options.addOption(getHdfsInfoFileOption());
         options.addOption(getSkipIfLenMatch());
         options.addOption(getForceCheckMD5Sum());
+        options.addOption(getDecompressHar());
         options.addOption(getMaxTaskNumOption());
         options.addOption(getMaxMultiPartUploadTaskNumOption());
         options.addOption(getPartSize());
@@ -68,12 +71,13 @@ public class OptionsArgsName {
     }
 
     public static Option getHelpOption() {
-        return Option.builder(HELP).longOpt("help").desc("print help message").build();
+        return Option.builder(HELP).longOpt("help")
+                .desc("print help message").build();
     }
 
     public static Option getAppidOption() {
-        return Option.builder(APPID).longOpt(APPID).argName("appid").hasArg().desc("the cos appid, deprecated by bucket flags")
-                .build();
+        return Option.builder(APPID).longOpt(APPID).argName("appid").hasArg()
+                .desc("the cos appid, deprecated by bucket flags").build();
     }
 
     public static Option getBucketOption() {
@@ -104,8 +108,8 @@ public class OptionsArgsName {
     }
 
     public static Option getMaxTaskNumOption() {
-        return Option.builder(MAX_TASK_NUM).longOpt(MAX_TASK_NUM).hasArg().desc("max parallel task num to upload file default 4")
-                .build();
+        return Option.builder(MAX_TASK_NUM).longOpt(MAX_TASK_NUM).hasArg()
+                .desc("max parallel task num to upload file default 4").build();
     }
 
     public static Option getMaxMultiPartUploadTaskNumOption() {
@@ -115,9 +119,8 @@ public class OptionsArgsName {
     }
 
     public static Option getSecretKeyOption() {
-        return Option.builder(SECRET_KEY).argName(SECRET_KEY).hasArg().desc(
-                "the cos secret key")
-                .build();
+        return Option.builder(SECRET_KEY).argName(SECRET_KEY).hasArg()
+                .desc("the cos secret key").build();
     }
 
     public static Option getHdfsPathOption() {
@@ -152,6 +155,12 @@ public class OptionsArgsName {
                         + "disable.").build();
     }
 
+    public static Option getDecompressHar() {
+        return Option.builder(DECOMPRESS_HAR).longOpt(DECOMPRESS_HAR)
+                .desc("Enable the decompression of the har file during the "
+                        + "transmission.").build();
+    }
+
     public static Option getPartSize() {
         return Option.builder(UPLOAD_PART_SIZE).longOpt(UPLOAD_PART_SIZE).hasArg()
                 .desc("the maximum size of a single block when use the "
@@ -163,8 +172,8 @@ public class OptionsArgsName {
                 .desc("the maximum retry count when uploading failed.").build();
     }
 
-    public static Option getRetryInterval(){
+    public static Option getRetryInterval() {
         return Option.builder(RETRY_INTERVAL).longOpt(RETRY_INTERVAL).hasArg()
-            .desc("the interval between retries.").build();
+                .desc("the interval between retries.").build();
     }
 }
