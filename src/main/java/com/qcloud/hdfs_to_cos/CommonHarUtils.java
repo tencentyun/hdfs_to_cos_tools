@@ -62,14 +62,11 @@ public class CommonHarUtils {
 
         String harFileFolderPath =
                 new Path(configReader.getSrcHdfsPath()).toUri().getPath();
-        System.out.println("harFileFolderPath: " + harFileFolderPath);
         String destPath = configReader.getDestCosPath();
         if (destPath.endsWith("/")) {
             destPath = destPath.substring(0, destPath.length() - 1);
         }
-        System.out.println("Dest path: " + destPath);
         String filePath = harFilePath.toUri().getPath();
-        System.out.println("file path: " + filePath);
         String cosPath;
         if (harFileSystem.getFileStatus(new Path(filePath)).isFile()) {
             cosPath = filePath.replaceFirst(harFileFolderPath, destPath);
