@@ -40,6 +40,7 @@ public class OptionsArgsName {
     public static final String UPLOAD_PART_SIZE = "max_upload_part_size";
     public static final String MAX_RETRY_NUM = "max_retry_num"; // 失败重试的次数
     public static final String RETRY_INTERVAL = "retry_interval";
+    public static final String STORAGE_CLASS = "storage_class";
 
     public static Options getAllSupportOption() {
         Options options = new Options();
@@ -62,6 +63,7 @@ public class OptionsArgsName {
         options.addOption(getPartSize());
         options.addOption(getMaxRetryNum());
         options.addOption(getRetryInterval());
+        options.addOption(getStorageClass());
         return options;
     }
 
@@ -175,5 +177,10 @@ public class OptionsArgsName {
     public static Option getRetryInterval() {
         return Option.builder(RETRY_INTERVAL).longOpt(RETRY_INTERVAL).hasArg()
                 .desc("the interval between retries.").build();
+    }
+
+    public static Option getStorageClass() {
+        return Option.builder(STORAGE_CLASS).longOpt(STORAGE_CLASS).hasArg()
+                .desc("storage class as one of [Standard/Standard_IA/Archive").build();
     }
 }
