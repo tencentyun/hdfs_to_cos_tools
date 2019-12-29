@@ -61,5 +61,4 @@ public class Statistics {
         System.out.println(infoMsg);
         System.out.println(String.format("[Used Time: %d s]", (endTime.getTime() - startTime.getTime()) / 1000));
     }
-
 }

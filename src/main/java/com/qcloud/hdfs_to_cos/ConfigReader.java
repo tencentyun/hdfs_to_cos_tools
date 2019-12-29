@@ -1,14 +1,14 @@
 package com.qcloud.hdfs_to_cos;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Properties;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 
 public class ConfigReader {
 
@@ -76,7 +76,7 @@ public class ConfigReader {
             this.destCosPath =
                     getRequiredStringParam(OptionsArgsName.COS_PATH, null);
             this.storageClass =
-                    getRequiredStringParam(OptionsArgsName.STORAGE_CLASS, "Standard");
+                    getRequiredStringParam(OptionsArgsName.STORAGE_CLASS, "STANDARD");
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
             this.maxMultiPartUploadTaskNum =
@@ -97,7 +97,8 @@ public class ConfigReader {
             if (cli.hasOption(OptionsArgsName.UPLOAD_PART_SIZE)) {
                 this.partSize = formatLongStr(
                         OptionsArgsName.UPLOAD_PART_SIZE,
-                        getRequiredStringParam(OptionsArgsName.UPLOAD_PART_SIZE, String.valueOf(this.DEFAULT_PART_SIZE))).intValue();
+                        getRequiredStringParam(OptionsArgsName.UPLOAD_PART_SIZE,
+                                String.valueOf(ConfigReader.DEFAULT_PART_SIZE))).intValue();
             }
 
             if (cli.hasOption(OptionsArgsName.MAX_RETRY_NUM)) {
@@ -115,8 +116,7 @@ public class ConfigReader {
 
         } catch (IllegalArgumentException e) {
             this.initConfigFlag = false;
-            this.initErrMsg = String.format(e.getMessage());
-            return;
+            this.initErrMsg = e.getMessage();
         }
     }
 
@@ -146,7 +146,7 @@ public class ConfigReader {
             this.hdfsFS = FileSystem.get(conf);
         } catch (IOException e) {
             this.initConfigFlag = false;
-            this.initErrMsg = String.format(e.getMessage());
+            this.initErrMsg = e.getMessage();
             return false;
         }
 
@@ -220,8 +220,7 @@ public class ConfigReader {
 
     private Long formatLongStr(String key, String valueStr) throws IllegalArgumentException {
         try {
-            long longValue = Long.valueOf(valueStr);
-            return longValue;
+            return Long.parseLong(valueStr);
         } catch (NumberFormatException e) {
             String errMsg = String.format("config error: %s value is illeagl "
                     + "num!", key);

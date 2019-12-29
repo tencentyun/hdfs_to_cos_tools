@@ -181,6 +181,6 @@ public class OptionsArgsName {
 
     public static Option getStorageClass() {
         return Option.builder(STORAGE_CLASS).longOpt(STORAGE_CLASS).hasArg()
-                .desc("storage class as one of [Standard/Standard_IA/Archive").build();
+                .desc("storage class as one of [STANDARD/STANDARD_IA/ARCHIVE").build();
     }
 }
