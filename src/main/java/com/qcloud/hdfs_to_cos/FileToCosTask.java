@@ -37,6 +37,7 @@ public class FileToCosTask implements Runnable {
     protected FileSystem fileSystem = null;
     protected String md5sum = null;         // 文件的md5sum
     protected String cosPath = null;
+    protected String storageClass = null;
 
     public FileToCosTask(
             ConfigReader configReader,
@@ -60,6 +61,7 @@ public class FileToCosTask implements Runnable {
         this.fileSystem = fileSystem;
         this.md5sum = md5sum;
         this.cosPath = cosPath;
+        this.storageClass = configReader.getStorageClass();
         this.kMaxRetryNum = configReader.getMaxRetryNum();
         this.kRetryInterval = configReader.getRetryInterval();
     }
@@ -282,7 +284,8 @@ public class FileToCosTask implements Runnable {
                 metadata.setContentLength(fileSize);
                 PutObjectRequest putObjectRequest =
                         new PutObjectRequest(configReader.getBucket(),
-                                this.cosPath, fStream, metadata);
+                                this.cosPath, fStream, metadata)
+                        .withStorageClass(this.storageClass);
                 PutObjectResult result =
                         this.cosClient.putObject(putObjectRequest);
                 isUploadSuccess = true;
@@ -624,7 +627,8 @@ public class FileToCosTask implements Runnable {
         }
 
         InitiateMultipartUploadRequest initiateMultipartUploadRequest =
-                new InitiateMultipartUploadRequest(this.configReader.getBucket(), this.cosPath);
+                new InitiateMultipartUploadRequest(this.configReader.getBucket(), this.cosPath)
+                .withStorageClass(this.storageClass);
         InitiateMultipartUploadResult initiateMultipartUploadResult = null;
 
         for (int i = 0; i < kMaxRetryNum; i++) {

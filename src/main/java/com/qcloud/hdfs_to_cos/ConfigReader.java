@@ -23,6 +23,7 @@ public class ConfigReader {
     private String endpointSuffix;
     private String srcHdfsPath;
     private String destCosPath;
+    private String storageClass;
     private boolean skipIfLengthMatch = false;
     // 是否开启强制校验MD5值,如果没有开启则只校验文件长度
     private boolean forceCheckMD5Sum = false;
@@ -74,6 +75,8 @@ public class ConfigReader {
                     getRequiredStringParam(OptionsArgsName.HDFS_PATH, null);
             this.destCosPath =
                     getRequiredStringParam(OptionsArgsName.COS_PATH, null);
+            this.storageClass =
+                    getRequiredStringParam(OptionsArgsName.STORAGE_CLASS, "Standard");
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
             this.maxMultiPartUploadTaskNum =
@@ -264,6 +267,10 @@ public class ConfigReader {
 
     public String getDestCosPath() {
         return destCosPath;
+    }
+
+    public String getStorageClass() {
+        return storageClass;
     }
 
     public int getMaxTaskNum() {
