@@ -43,6 +43,9 @@ public class ConfigReader {
     private long retryInterval = DEFAULT_MAX_RETRY_INTERVAL;
     private static final long DEFAULT_MAX_RETRY_INTERVAL = 500;
 
+    private int trafficLimit = DEFAULT_TRAFFIC_LIMIT;
+    private static final int DEFAULT_TRAFFIC_LIMIT = -1;
+
     public ConfigReader(CommandLine cli) {
         this.cli = cli;
         init();
@@ -76,7 +79,7 @@ public class ConfigReader {
             this.destCosPath =
                     getRequiredStringParam(OptionsArgsName.COS_PATH, null);
             this.storageClass =
-                    getRequiredStringParam(OptionsArgsName.STORAGE_CLASS, "STANDARD");
+                    getRequiredStringParam(OptionsArgsName.STORAGE_CLASS, "Standard");
             this.maxTaskNum = formatLongStr(OptionsArgsName.MAX_TASK_NUM,
                     getRequiredStringParam(OptionsArgsName.MAX_TASK_NUM, "4")).intValue();
             this.maxMultiPartUploadTaskNum =
@@ -112,6 +115,13 @@ public class ConfigReader {
                         formatLongStr(OptionsArgsName.RETRY_INTERVAL,
                                 getRequiredStringParam(OptionsArgsName.RETRY_INTERVAL,
                                         String.valueOf(ConfigReader.DEFAULT_MAX_RETRY_INTERVAL))).intValue();
+            }
+
+            if (cli.hasOption(OptionsArgsName.TRAFFIC_LIMIT)) {
+                this.trafficLimit = formatLongStr(
+                        OptionsArgsName.TRAFFIC_LIMIT,
+                        getRequiredStringParam(OptionsArgsName.TRAFFIC_LIMIT,
+                                String.valueOf(ConfigReader.DEFAULT_TRAFFIC_LIMIT))).intValue();
             }
 
         } catch (IllegalArgumentException e) {
@@ -218,6 +228,15 @@ public class ConfigReader {
         return value.trim();
     }
 
+    private int formatIntStr(String key, String valueStr) {
+        try {
+            return Integer.parseInt(valueStr);
+        } catch (NumberFormatException e) {
+            String errMessage = String.format("config error: %s value is illegal num!", key);
+            throw new IllegalArgumentException(errMessage);
+        }
+    }
+
     private Long formatLongStr(String key, String valueStr) throws IllegalArgumentException {
         try {
             return Long.parseLong(valueStr);
@@ -278,6 +297,10 @@ public class ConfigReader {
 
     public int getMaxUploadPartTaskNum() {
         return maxMultiPartUploadTaskNum;
+    }
+
+    public int getTrafficLimit() {
+        return trafficLimit;
     }
 
     public int getPartSize() {

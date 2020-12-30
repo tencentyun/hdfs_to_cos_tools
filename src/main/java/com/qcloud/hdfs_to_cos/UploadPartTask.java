@@ -23,9 +23,9 @@ public class UploadPartTask implements Callable<PartETag> {
     private long retryInterval = 500;
 
     public UploadPartTask(FileSystem fileSystem, Path filePath, String key,
-            String uploadId, int partNumber, long pos,
-            long partSize, COSClient cosClient, Semaphore semaphore,
-            ConfigReader configReader) {
+                          String uploadId, int partNumber, long pos,
+                          long partSize, COSClient cosClient, Semaphore semaphore,
+                          ConfigReader configReader) {
         super();
         this.fileSystem = fileSystem;
         this.filePath = filePath;
@@ -61,6 +61,9 @@ public class UploadPartTask implements Callable<PartETag> {
                         new UploadPartRequest().withBucketName(configReader.getBucket())
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
                                 .withInputStream(fStream).withPartSize(partSize);
+                if (this.configReader.getTrafficLimit() > 0) {
+                    uploadRequest.setTrafficLimit(this.configReader.getTrafficLimit());
+                }
                 PartETag etag =
                         cosClient.uploadPart(uploadRequest).getPartETag();
                 log.info("upload part successfully, etag: " + etag.getETag() + ", part_number: "

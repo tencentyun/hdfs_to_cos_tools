@@ -41,6 +41,7 @@ public class OptionsArgsName {
     public static final String MAX_RETRY_NUM = "max_retry_num"; // 失败重试的次数
     public static final String RETRY_INTERVAL = "retry_interval";
     public static final String STORAGE_CLASS = "storage_class";
+    public static final String TRAFFIC_LIMIT = "traffic_limit";
 
     public static Options getAllSupportOption() {
         Options options = new Options();
@@ -64,6 +65,7 @@ public class OptionsArgsName {
         options.addOption(getMaxRetryNum());
         options.addOption(getRetryInterval());
         options.addOption(getStorageClass());
+        options.addOption(getTrafficLimit());
         return options;
     }
 
@@ -182,5 +184,10 @@ public class OptionsArgsName {
     public static Option getStorageClass() {
         return Option.builder(STORAGE_CLASS).longOpt(STORAGE_CLASS).hasArg()
                 .desc("storage class as one of [STANDARD/STANDARD_IA/ARCHIVE").build();
+    }
+
+    public static Option getTrafficLimit() {
+        return Option.builder(TRAFFIC_LIMIT).longOpt("TRAFFIC_LIMIT").hasArg()
+                .desc("the traffic limit for transfer data").build();
     }
 }

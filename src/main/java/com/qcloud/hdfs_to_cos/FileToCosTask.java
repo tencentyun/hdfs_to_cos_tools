@@ -285,7 +285,10 @@ public class FileToCosTask implements Runnable {
                 PutObjectRequest putObjectRequest =
                         new PutObjectRequest(configReader.getBucket(),
                                 this.cosPath, fStream, metadata)
-                        .withStorageClass(this.storageClass);
+                                .withStorageClass(this.storageClass);
+                if (this.configReader.getTrafficLimit() > 0) {
+                    putObjectRequest.setTrafficLimit(this.configReader.getTrafficLimit());
+                }
                 PutObjectResult result =
                         this.cosClient.putObject(putObjectRequest);
                 isUploadSuccess = true;
@@ -628,7 +631,7 @@ public class FileToCosTask implements Runnable {
 
         InitiateMultipartUploadRequest initiateMultipartUploadRequest =
                 new InitiateMultipartUploadRequest(this.configReader.getBucket(), this.cosPath)
-                .withStorageClass(this.storageClass);
+                        .withStorageClass(this.storageClass);
         InitiateMultipartUploadResult initiateMultipartUploadResult = null;
 
         for (int i = 0; i < kMaxRetryNum; i++) {
