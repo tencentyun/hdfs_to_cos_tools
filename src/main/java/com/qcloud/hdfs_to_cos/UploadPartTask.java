@@ -62,7 +62,15 @@ public class UploadPartTask implements Callable<PartETag> {
                                 .withUploadId(uploadId).withKey(key).withPartNumber(partNumber)
                                 .withInputStream(fStream).withPartSize(partSize);
                 if (this.configReader.getTrafficLimit() > 0) {
-                    uploadRequest.setTrafficLimit(this.configReader.getTrafficLimit());
+                    int singleTrafficLimit =
+                        (int) Math.ceil(
+                            (double) this.configReader.getTrafficLimit()
+                                / (double) this.configReader.getMaxTaskNum()
+                                / (this.configReader.getMaxUploadPartTaskNum()  - semaphore.availablePermits()));
+                    if (singleTrafficLimit < 819200) {
+                      singleTrafficLimit = 819200;
+                    }
+                    uploadRequest.setTrafficLimit(singleTrafficLimit);
                 }
                 PartETag etag =
                         cosClient.uploadPart(uploadRequest).getPartETag();

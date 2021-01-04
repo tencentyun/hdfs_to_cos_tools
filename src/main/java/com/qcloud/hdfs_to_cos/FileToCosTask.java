@@ -246,7 +246,6 @@ public class FileToCosTask implements Runnable {
             InputStream fStream = null;
             try {
                 // 如果开启了强制校验MD5，那么首先要检查文件的MD5值
-
                 if (configReader.isForceCheckMD5Sum() && null == this.md5sum) {
                     fStream = this.fileSystem.open(this.fileStatus.getPath());
                     fStream.skip(0);
@@ -287,7 +286,12 @@ public class FileToCosTask implements Runnable {
                                 this.cosPath, fStream, metadata)
                                 .withStorageClass(this.storageClass);
                 if (this.configReader.getTrafficLimit() > 0) {
-                    putObjectRequest.setTrafficLimit(this.configReader.getTrafficLimit());
+                    int singleTrafficLimit = (int) Math.ceil(
+                        (double) this.configReader.getTrafficLimit() / (double) this.configReader.getMaxTaskNum());
+                    if(singleTrafficLimit < 819200) {
+                      singleTrafficLimit = 819200;
+                    }
+                    putObjectRequest.setTrafficLimit(singleTrafficLimit);
                 }
                 PutObjectResult result =
                         this.cosClient.putObject(putObjectRequest);

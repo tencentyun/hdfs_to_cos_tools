@@ -71,6 +71,7 @@ public class OptionsArgsName {
 
     public static void printHelpOption() {
         HelpFormatter formatter = new HelpFormatter();
+        formatter.setWidth(150);
         formatter.printHelp("hdfs_to_cos", getAllSupportOption());
     }
 

@@ -186,13 +186,9 @@ public class HdfsToCos {
 
     public void run() {
         if (!checkCosClientLegal()) {
-            StringBuilder errMsgBuilder =
-                    new StringBuilder("Configuration information verification"
-                            + " error:\n");
-            errMsgBuilder.append(this.configCheckMsg);
-            System.err.println(errMsgBuilder.toString());
-            cosClient.shutdown();
-            return;
+            String errMsgBuilder = "Configuration information verification"
+                + " error:\n" + this.configCheckMsg;
+            throw new IllegalArgumentException(errMsgBuilder);
         }
 
         try {
@@ -211,7 +207,5 @@ public class HdfsToCos {
         } catch (Exception e) {             // 这里直接捕获一个基类的异常，就不判断了
             log.error("Scanning hdfs/har files occurs an exception.", e);
         }
-
-        cosClient.shutdown();
     }
 }

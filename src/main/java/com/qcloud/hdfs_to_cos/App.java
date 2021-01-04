@@ -110,5 +110,6 @@ public class App {
                     + "pool to complete", e);
         }
         Statistics.instance.printStatics();
+        App.cosClient.shutdown();
     }
 }
